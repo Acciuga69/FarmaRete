@@ -734,28 +734,93 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   .route-list-wrap { width: 400px; }
 }
 
-/* ── IPAD LANDSCAPE ── */
-@media (min-width: 900px) and (orientation: landscape) {
+/* ── IPAD / TABLET LANDSCAPE — sidebar sinistra ── */
+@media (min-width: 768px) {
+  #app {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "sidebar topbar"
+      "sidebar content";
+  }
+  .topbar {
+    grid-area: topbar;
+    padding-left: 20px;
+    height: 56px;
+  }
   .nav-tabs {
-    position: fixed;
-    left: 0; top: 0; bottom: 0;
+    grid-area: sidebar;
     flex-direction: column;
-    width: calc(72px + var(--safe-left));
-    height: 100dvh;
+    width: 80px;
+    height: 100%;
     border-top: none;
     border-right: 1px solid var(--border);
-    padding-left: var(--safe-left);
+    border-bottom: none;
     padding-bottom: var(--safe-bottom);
+    padding-top: 8px;
     box-shadow: 2px 0 12px rgba(0,0,0,0.06);
     order: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    justify-content: flex-start;
+    height: unset;
   }
-  .nav-tab { border-top: none; border-right: 3px solid transparent; min-height: 64px; width: 100%; flex-direction: column; }
-  .nav-tab.active { border-right-color: var(--green); border-top: none; }
-  .topbar { padding-left: calc(72px + var(--safe-left) + 16px); }
-  #app { flex-direction: row; flex-wrap: wrap; }
-  #app > .topbar { width: 100%; order: 0; }
-  #app > .nav-tabs { order: 1; }
-  #app > .page { order: 2; flex: 1; }
+  .page {
+    grid-area: content;
+  }
+  .nav-tab {
+    border-top: none;
+    border-left: 3px solid transparent;
+    border-right: none;
+    min-height: 64px;
+    width: 100%;
+    flex-direction: column;
+    padding: 10px 4px;
+    font-size: 0.6rem;
+  }
+  .nav-tab.active {
+    border-left-color: var(--green);
+    border-top: none;
+    background: var(--green-light);
+  }
+  .nav-tab svg { width: 24px; height: 24px; }
+  .percorso-body { flex-direction: row; }
+  .route-list-wrap { width: 42%; max-height: unset; border-right: 1px solid var(--border); }
+  .map-wrap { flex: 1; }
+  .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ── PHONE — bottom nav ── */
+@media (max-width: 767px) {
+  .nav-tabs {
+    order: 999;
+    flex-direction: row;
+    height: calc(var(--nav-h) + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
+    border-top: 1px solid var(--border);
+    border-right: none;
+    width: 100%;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  }
+  .nav-tab {
+    border-left: none;
+    border-top: 2px solid transparent;
+    min-height: 44px;
+    flex-direction: column;
+    font-size: 0.6rem;
+  }
+  .nav-tab.active {
+    border-top-color: var(--green);
+    border-left: none;
+    background: none;
+  }
+  select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
+  .percorso-body { flex-direction: column; }
+  .route-list-wrap { width: 100%; max-height: 42svh; border-right: none; border-bottom: 1px solid var(--border); }
+  .map-wrap { min-height: 35svh; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
 }
 
 /* Empty states */
@@ -980,12 +1045,18 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <!-- GRAFICO MENSILE -->
       <div>
         <div class="section-title">📊 Visite mensili</div>
-        <div style="background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);">
-          <canvas id="chart-mensile" height="140"></canvas>
+        <div style="background:var(--card);border-radius:var(--radius);padding:12px 16px 8px;box-shadow:var(--shadow-sm);">
+          <canvas id="chart-mensile" height="80"></canvas>
           <div style="display:flex;justify-content:center;gap:16px;margin-top:10px;font-size:0.7rem;color:var(--ink3);">
             <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:2px;margin-right:4px;"></span>Visitate</span>
             <span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);border-radius:2px;margin-right:4px;"></span>Richiami</span>
           </div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">📅 Prossimi appuntamenti</div>
+        <div class="activity-list" id="appointments-list">
+          <div class="empty-state"><div class="icon">📅</div><h4>Nessun appuntamento</h4><p>Inserisci una data futura nel modal di una farmacia.</p></div>
         </div>
       </div>
       <div>
@@ -1161,9 +1232,9 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <input type="number" id="modal-freq" value="90" min="7" max="365" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;">
       </div>
       <div>
-        <div class="modal-section-label">Data ultima visita</div>
+        <div class="modal-section-label">📅 Data visita / Appuntamento</div>
         <input type="date" id="modal-data-visita" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;">
-        <div style="font-size:0.7rem;color:var(--ink3);margin-top:4px;">Inserisci una data retroattiva se hai già visitato questa farmacia</div>
+        <div id="modal-data-hint" style="font-size:0.7rem;margin-top:4px;"></div>
       </div>
       <div>
         <div class="modal-section-label">Note visita</div>
@@ -1710,6 +1781,31 @@ function refreshDashboard() {
     }).join('');
   }
 
+  // Prossimi appuntamenti
+  const apl = document.getElementById('appointments-list');
+  const appointments = [];
+  FARMACIE.forEach(f => {
+    const fd = data[String(f.id)] || {};
+    if (fd.dataAppuntamento) {
+      const appt = new Date(fd.dataAppuntamento);
+      const oggi = new Date(); oggi.setHours(0,0,0,0);
+      if (appt >= oggi) appointments.push({f, fd, appt});
+    }
+  });
+  appointments.sort((a,b) => a.appt - b.appt);
+  if (!appointments.length) {
+    apl.innerHTML = '<div class="empty-state"><div class="icon">📅</div><h4>Nessun appuntamento</h4><p>Inserisci una data futura nel modal di una farmacia.</p></div>';
+  } else {
+    apl.innerHTML = appointments.slice(0,6).map(({f, fd, appt}) => {
+      const diff = Math.floor((appt - new Date().setHours(0,0,0,0)) / 86400000);
+      const label = diff === 0 ? 'Oggi!' : diff === 1 ? 'Domani' : appt.toLocaleDateString('it-IT', {weekday:'short', day:'numeric', month:'short'});
+      return `<div class="activity-item" style="background:var(--green-light);border-left:3px solid var(--green);" onclick="openModal(${f.id})">
+        <div class="activity-name">📅 ${fd.nomeCustom||f.n}</div>
+        <div class="activity-meta" style="color:var(--green);font-weight:600;">${label} · ${f.loc}</div>
+      </div>`;
+    }).join('');
+  }
+
   // Ultime visite
   const al = document.getElementById('activity-list');
   const allVisits = [];
@@ -1752,8 +1848,34 @@ function formatDate(d) {
 // ══════════════════════════════════════════════
 function giorniDaUltima(id) {
   const fd = getFD(String(id));
+  // Se c'è un appuntamento futuro, non è scaduta
+  if (fd.dataAppuntamento) {
+    const appt = new Date(fd.dataAppuntamento);
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    if (appt > oggi) return -1; // valore speciale: appuntamento futuro
+  }
   if (!fd.dataVisita) return Infinity;
   return Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+}
+
+function isAppuntamentoFuturo(id) {
+  const fd = getFD(String(id));
+  if (!fd.dataAppuntamento) return false;
+  const appt = new Date(fd.dataAppuntamento);
+  const oggi = new Date(); oggi.setHours(0,0,0,0);
+  return appt >= oggi;
+}
+
+function getLabelAppuntamento(id) {
+  const fd = getFD(String(id));
+  if (!fd.dataAppuntamento) return null;
+  const appt = new Date(fd.dataAppuntamento);
+  const oggi = new Date(); oggi.setHours(0,0,0,0);
+  if (appt < oggi) return null;
+  const diff = Math.floor((appt - oggi) / 86400000);
+  if (diff === 0) return '📅 Oggi!';
+  if (diff === 1) return '📅 Domani';
+  return '📅 ' + appt.toLocaleDateString('it-IT', {day:'numeric', month:'short'});
 }
 function calcolaFrequenzaAdattiva() {
   // Conta farmacie attive (non escluse, non fredde)
@@ -1778,6 +1900,7 @@ function frequenza(id) {
   return calcolaFrequenzaAdattiva();
 }
 function isScaduta(id) {
+  if (isAppuntamentoFuturo(id)) return false; // ha già un appuntamento
   return giorniDaUltima(id) >= frequenza(id);
 }
 
@@ -1990,7 +2113,10 @@ function renderDayList(dayIdx) {
 
     const numColor = stato==='visitata'?'var(--green)':stato==='assente'?'var(--red)':stato==='richiamare'?'var(--amber)':'var(--ink2)';
     const numLabel = stato==='visitata'?'✓':stato==='assente'?'✕':stato==='richiamare'?'↩':String(i+1);
-    const metaHtml = gg < Infinity ? `<span style="font-size:0.66rem;color:${scad?'var(--red)':'var(--ink3)'};">${scad?'⏰ ':''} ${gg}g fa</span>` : '';
+    const apptLabel = getLabelAppuntamento(f.id);
+    const metaHtml = apptLabel 
+      ? `<span style="font-size:0.66rem;color:var(--green);font-weight:700;">${apptLabel}</span>`
+      : gg < Infinity ? `<span style="font-size:0.66rem;color:${scad?'var(--red)':'var(--ink3)'};">${scad?'⏰ ':''} ${gg}g fa</span>` : '';
 
     item.innerHTML = `
       <div class="route-num" style="background:${numColor};">${numLabel}</div>
@@ -2367,13 +2493,44 @@ function openModal(id) {
   document.getElementById('modal-subtitle').textContent = `📍 ${f.a} · ${f.loc} (${f.c})`;
   document.getElementById('modal-notes').value = fd.note || '';
   document.getElementById('modal-freq').value = fd.frequenza || (fd.isTop?45:90);
-  // Data ultima visita
+  // Data visita / appuntamento
   const dataInput = document.getElementById('modal-data-visita');
-  if (fd.dataVisita) {
-    dataInput.value = new Date(fd.dataVisita).toISOString().split('T')[0];
+  const hint = document.getElementById('modal-data-hint');
+  const dataVal = fd.dataAppuntamento || fd.dataVisita;
+  if (dataVal) {
+    const d = new Date(dataVal);
+    dataInput.value = d.toISOString().split('T')[0];
+    const oggi = new Date();
+    oggi.setHours(0,0,0,0);
+    if (d > oggi) {
+      hint.textContent = '📅 Appuntamento fissato per il ' + d.toLocaleDateString('it-IT', {weekday:'long', day:'numeric', month:'long'});
+      hint.style.color = 'var(--green)';
+      hint.style.fontWeight = '600';
+    } else {
+      const gg = Math.floor((oggi - d) / 86400000);
+      hint.textContent = '✅ Visitata ' + (gg === 0 ? 'oggi' : gg === 1 ? 'ieri' : gg + ' giorni fa');
+      hint.style.color = 'var(--ink3)';
+      hint.style.fontWeight = 'normal';
+    }
   } else {
     dataInput.value = '';
+    hint.textContent = 'Data passata = ultima visita · Data futura = appuntamento';
+    hint.style.color = 'var(--ink3)';
+    hint.style.fontWeight = 'normal';
   }
+  // Aggiorna hint in tempo reale
+  dataInput.oninput = () => {
+    if (!dataInput.value) { hint.textContent = 'Data passata = ultima visita · Data futura = appuntamento'; hint.style.color = 'var(--ink3)'; return; }
+    const d = new Date(dataInput.value);
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    if (d > oggi) {
+      hint.textContent = '📅 Appuntamento per il ' + d.toLocaleDateString('it-IT', {weekday:'long', day:'numeric', month:'long'});
+      hint.style.color = 'var(--green)'; hint.style.fontWeight = '600';
+    } else {
+      hint.textContent = '✅ Visita effettuata';
+      hint.style.color = 'var(--ink3)'; hint.style.fontWeight = 'normal';
+    }
+  };
   const starBtn = document.getElementById('modal-star');
   starBtn.dataset.isTop = fd.isTop ? 'true' : 'false';
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
@@ -2410,11 +2567,20 @@ function saveModal() {
   const update = { stato, priorita, note, isTop, frequenza:freq };
   // Nome personalizzato
   if (nomeCustom) update.nomeCustom = nomeCustom;
-  // Data visita: manuale ha priorità, altrimenti oggi se stato impostato
+  // Data visita o appuntamento
   if (dataVisitaInput) {
-    update.dataVisita = new Date(dataVisitaInput).toISOString();
+    const d = new Date(dataVisitaInput);
+    const oggi = new Date(); oggi.setHours(0,0,0,0);
+    if (d > oggi) {
+      update.dataAppuntamento = d.toISOString();
+      update.dataVisita = null; // non ancora visitata
+    } else {
+      update.dataVisita = d.toISOString();
+      update.dataAppuntamento = null; // appuntamento passato, ora è visita
+    }
   } else if (stato && stato !== 'da-visitare') {
     update.dataVisita = new Date().toISOString();
+    update.dataAppuntamento = null;
   }
   setFD(currentFarmaciaId, update);
   closeModal();
