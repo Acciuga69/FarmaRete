@@ -839,6 +839,10 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .pulse { animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
+/* ── TAP FEEDBACK ── */
+.tap-flash { animation: tapFlash .35s ease; }
+@keyframes tapFlash { 0% { filter: brightness(1); } 40% { filter: brightness(1.5); } 100% { filter: brightness(1); } }
+
 
 /* ── CHART ── */
 .chart-wrap { position: relative; width: 100%; height: 180px; }
@@ -2006,17 +2010,14 @@ function buildRoute() {
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
   const totSlots = perDay * numDays;
 
-  // Escludi: escluse manualmente + visitate/assenti OGGI
-  const oggi = new Date().toDateString();
+  // Escludi: escluse manualmente + visitate non ancora scadute
+  // Le assenti restano sempre nel pool (il routing geografico decide se includerle)
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(f.id)) return false;
     const fd = getFD(f.id);
-    // Escludi se visitata o assente oggi
-    if ((fd.stato === 'visitata' || fd.stato === 'assente') && fd.dataVisita) {
-      const dataVisita = new Date(fd.dataVisita).toDateString();
-      if (dataVisita === oggi) return false;
-    }
+    // Verde: escludi finché frequenza non scaduta (anticipabile solo dalla scheda)
+    if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     return true;
   });
 
@@ -2979,6 +2980,16 @@ window.addEventListener('load', () => {
   renderScadenze();
   renderRichiami();
   generatePWAIcon();
+
+  // TAP FEEDBACK su tutti i bottoni
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-pill, .btn-esito, .pa-tab, .maps-btn, .btn-riammetti');
+    if (!btn) return;
+    btn.classList.remove('tap-flash');
+    void btn.offsetWidth;
+    btn.classList.add('tap-flash');
+    btn.addEventListener('animationend', () => btn.classList.remove('tap-flash'), { once: true });
+  });
 
   // iOS install hint (after 3s, only once)
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
