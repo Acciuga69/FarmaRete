@@ -1098,6 +1098,11 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       </div>
       <div class="controls-row">
         <button class="btn btn-green" onclick="buildRoute()">⚙ Genera percorsi</button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
+          <button class="btn" style="padding:8px 12px;font-size:0.85rem;" onclick="changeWeek(-1)">◀</button>
+          <span id="week-label" style="font-size:0.78rem;font-weight:600;color:var(--ink2);white-space:nowrap;">Sett. corrente</span>
+          <button class="btn" style="padding:8px 12px;font-size:0.85rem;" onclick="changeWeek(1)">▶</button>
+        </div>
         <button class="btn btn-amber" onclick="openGoogleMaps()">📍 Maps</button>
         <button class="btn btn-ghost" onclick="resetRoute()">✕</button>
       </div>
@@ -1728,6 +1733,7 @@ function saveEscluse() {
 // ══════════════════════════════════════════════
 let allPercorsi = [];
 let routeDates = [];
+let routeWeekOffset = 0;
 let currentPercorsoIdx = 0;
 let currentRoute = [];
 let selectedDay = 0;
@@ -2011,16 +2017,31 @@ function nearestNeighbor(list) {
   return route;
 }
 
-// Restituisce le date lavorative (lun-sab) a partire da oggi
+// Restituisce le date lavorative (lun-sab) con offset settimane
 function getWorkDays(numDays) {
   const days = [];
   const d = new Date();
+  // Applica offset settimane
+  d.setDate(d.getDate() + routeWeekOffset * 7);
+  // Se offset > 0 parti dal lunedì della settimana target
+  if (routeWeekOffset > 0) {
+    const dow = d.getDay();
+    const diff = dow === 0 ? 1 : (8 - dow) % 7 || 7;
+    if (dow !== 1) d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow));
+  }
   while (days.length < numDays) {
-    const dow = d.getDay(); // 0=dom, 6=sab
+    const dow = d.getDay();
     if (dow !== 0) days.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
   return days;
+}
+
+function changeWeek(dir) {
+  routeWeekOffset = Math.max(0, routeWeekOffset + dir);
+  const label = document.getElementById('week-label');
+  if (label) label.textContent = routeWeekOffset === 0 ? 'Sett. corrente' : `+${routeWeekOffset} sett.`;
+  buildRoute();
 }
 
 function buildRoute() {
@@ -2032,10 +2053,14 @@ function buildRoute() {
   routeDates = getWorkDays(numDays);
 
   // Pool base: escludi manuali + visitate non scadute
+  // ECCEZIONE: farmacie con appuntamento futuro entrano sempre nel pool
+  const oggi = new Date(); oggi.setHours(0,0,0,0);
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(f.id)) return false;
     const fd = getFD(f.id);
+    // Se ha un appuntamento futuro, includi sempre
+    if (fd.dataAppuntamento && new Date(fd.dataAppuntamento) >= oggi) return true;
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     return true;
   });
