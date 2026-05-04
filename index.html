@@ -1690,6 +1690,11 @@ const COORDS = {"CARATE BRIANZA":{lat:45.69,lng:9.24},"AGRATE BRIANZA":{lat:45.5
 // ══════════════════════════════════════════════
 // PERSISTENZA
 // ══════════════════════════════════════════════
+// Chiedi al browser di non cancellare mai lo storage
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist();
+}
+
 function loadData() {
   try { return JSON.parse(localStorage.getItem('farmarete_v3') || '{}'); } catch(e) { return {}; }
 }
