@@ -2065,21 +2065,23 @@ function buildRoute() {
     return true;
   });
 
-  // Costruisci percorso giorno per giorno
-  function buildDays(poolList) {
+  const localStr = dt => `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+
+  // Costruisce i giorni di UNA settimana, escludendo farmacie già usate
+  function buildDays(poolList, preUsed) {
     const days = [];
-    const usedIds = new Set();
+    const usedIds = new Set(preUsed || []);
 
     for (let d = 0; d < numDays; d++) {
       const dayDate = routeDates[d];
-      const dayStr = dayDate.toDateString();
+      const dayStr = localStr(dayDate);
 
       // Prima: farmacie con appuntamento fissato per questo giorno
       const pinned = poolList.filter(f => {
         if (usedIds.has(f.id)) return false;
         const fd = getFD(f.id);
         if (!fd.dataAppuntamento) return false;
-        return new Date(fd.dataAppuntamento).toDateString() === dayStr;
+        return localStr(new Date(fd.dataAppuntamento)) === dayStr;
       });
       pinned.forEach(f => usedIds.add(f.id));
 
@@ -2089,24 +2091,50 @@ function buildRoute() {
       const filled = nearestNeighbor([...free]).slice(0, slots);
       filled.forEach(f => usedIds.add(f.id));
 
-      // Ottimizza l'ordine geografico del giorno completo
-      const dayFarmacie = nearestNeighbor([...pinned, ...filled]);
-      days.push(dayFarmacie);
+      days.push(nearestNeighbor([...pinned, ...filled]));
     }
-    return days;
+    return { days, usedIds };
+  }
+
+  // Costruisce tutte le settimane fino all'offset e restituisce l'ultima
+  function buildAllWeeks(poolList) {
+    let usedIds = new Set();
+    let result = { days: [] };
+    for (let w = 0; w <= routeWeekOffset; w++) {
+      // Per ogni settimana aggiorna le date
+      const savedDates = routeDates;
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() + w * 7);
+      if (w > 0) {
+        // Porta al lunedì della settimana target
+        const dow = weekStart.getDay();
+        if (dow !== 1) weekStart.setDate(weekStart.getDate() + (dow === 0 ? 1 : 8 - dow));
+      }
+      const weekDates = [];
+      const tmp = new Date(weekStart);
+      while (weekDates.length < numDays) {
+        if (tmp.getDay() !== 0) weekDates.push(new Date(tmp));
+        tmp.setDate(tmp.getDate() + 1);
+      }
+      if (w === routeWeekOffset) routeDates = weekDates;
+      result = buildDays(poolList, usedIds);
+      usedIds = result.usedIds;
+      if (w < routeWeekOffset) routeDates = savedDates;
+    }
+    return result.days;
   }
 
   // A — Ottimale
-  const percA = buildDays([...pool]);
+  const percA = buildAllWeeks([...pool]);
 
   // B — Top client prima
   const topP = pool.filter(f => getFD(f.id).isTop);
   const normP = pool.filter(f => !getFD(f.id).isTop);
-  const percB = buildDays([...topP, ...normP]);
+  const percB = buildAllWeeks([...topP, ...normP]);
 
   // C — Scadenze (chi non vede da più tempo)
   const scadPool = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
-  const percC = buildDays(scadPool);
+  const percC = buildAllWeeks(scadPool);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
@@ -2227,7 +2255,10 @@ function quickEsito(e, id, esito) {
   if (fd.stato === esito) {
     setFD(id, {stato:'', dataVisita:null});
   } else {
-    setFD(id, {stato:esito, dataVisita:new Date().toISOString()});
+    // Se visitata oggi, azzera anche l'appuntamento (è stato evaso)
+    const update = {stato:esito, dataVisita:new Date().toISOString()};
+    if (esito === 'visitata') update.dataAppuntamento = null;
+    setFD(id, update);
   }
   renderDayList(selectedDay);
   updateBadges();
