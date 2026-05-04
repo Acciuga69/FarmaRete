@@ -2047,8 +2047,12 @@ function changeWeek(dir) {
 // Converte qualsiasi data in YYYY-MM-DD senza problemi di timezone
 function toYMD(val) {
   if (!val) return '';
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-  return new Date(val).toLocaleDateString('sv-SE');
+  if (typeof val === 'string' && val.length === 10 && val[4] === '-') return val;
+  const d = new Date(val);
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + dd;
 }
 
 function buildRoute() {
@@ -2069,6 +2073,11 @@ function buildRoute() {
     // Se ha un appuntamento futuro, includi sempre
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= new Date().toISOString().slice(0,10)) return true;
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
+    // Assente: escludi per 3 giorni
+    if (fd.stato === 'assente' && fd.dataVisita) {
+      const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+      if (gg < 3) return false;
+    }
     return true;
   });
 
@@ -2095,43 +2104,34 @@ function buildRoute() {
   function buildDays(poolList, preUsed, weekDates) {
     const days = [];
     const usedIds = new Set(preUsed || []);
-    const weekStrs = weekDates.map(d => toYMD(d));
-
-    // Pool filtrato per questa settimana:
-    // - senza appuntamento: normale frequenza
-    // - con appuntamento in questa settimana: includi come pinned
-    // - con appuntamento in settimana futura: escludi (non ancora il momento)
-    // - con appuntamento scaduto (passato, non visitato): includi come normale
-    const weekStart = weekDates[0]; weekStart.setHours(0,0,0,0);
-    const weekEnd = new Date(weekDates[weekDates.length-1]); weekEnd.setHours(23,59,59,999);
+    const todayYMD = toYMD(new Date());
 
     for (let d = 0; d < numDays; d++) {
-      const dayStr = weekStrs[d];
+      const dayStr = toYMD(weekDates[d]);
 
-      // Prima: farmacie con appuntamento fissato ESATTAMENTE per questo giorno
-      const pinned = poolList.filter(f => {
-        if (usedIds.has(f.id)) return false;
+      // STEP 1: farmacie con appuntamento esattamente per questo giorno
+      // Cerca in TUTTE le farmacie (non solo poolList) per non perdere appuntamenti
+      const pinned = FARMACIE.filter(f => {
+        if (usedIds.has(String(f.id))) return false;
+        if (prov !== 'ALL' && f.p !== prov) return false;
+        if (escluseIds.has(String(f.id))) return false;
         const fd = getFD(f.id);
         if (!fd.dataAppuntamento) return false;
         return toYMD(fd.dataAppuntamento) === dayStr;
       });
-      pinned.forEach(f => usedIds.add(f.id));
+      pinned.forEach(f => usedIds.add(String(f.id)));
 
-      // Poi: riempi con farmacie senza appuntamento futuro o con appuntamento scaduto
+      // STEP 2: riempi con farmacie senza appuntamento futuro
       const free = poolList.filter(f => {
-        if (usedIds.has(f.id)) return false;
+        if (usedIds.has(String(f.id))) return false;
         const fd = getFD(f.id);
-        if (fd.dataAppuntamento) {
-          const apptYMD = toYMD(fd.dataAppuntamento);
-          const weekStartYMD = toYMD(weekStart);
-          // Escludi se ha appuntamento da oggi in poi (questa o futura settimana)
-          if (apptYMD >= weekStartYMD) return false;
-        }
+        // Escludi se ha appuntamento futuro (andrà nel suo giorno)
+        if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
         return true;
       });
       const slots = Math.max(0, perDay - pinned.length);
       const filled = nearestNeighbor([...free]).slice(0, slots);
-      filled.forEach(f => usedIds.add(f.id));
+      filled.forEach(f => usedIds.add(String(f.id)));
 
       days.push(nearestNeighbor([...pinned, ...filled]));
     }
@@ -2166,13 +2166,14 @@ function buildRoute() {
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
   currentRoute = percA;
-  selectedDay = 0;
+  const keepDay = Math.min(selectedDay, percA.length - 1);
+  selectedDay = keepDay;
 
   document.getElementById('percorsi-alt').style.display = 'flex';
   document.querySelectorAll('.pa-tab').forEach((t,i) => t.classList.toggle('active', i===0));
 
   renderDayTabs();
-  renderDayList(0);
+  renderDayList(keepDay);
   renderEscluse();
   updateBadges();
 
