@@ -1690,6 +1690,13 @@ const COORDS = {"CARATE BRIANZA":{lat:45.69,lng:9.24},"AGRATE BRIANZA":{lat:45.5
 // ══════════════════════════════════════════════
 // PERSISTENZA
 // ══════════════════════════════════════════════
+// Rimuovi eventuali Service Worker vecchi e problematici
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
+}
+
 // Chiedi al browser di non cancellare mai lo storage
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist();
@@ -1720,6 +1727,7 @@ function saveEscluse() {
 // STATO GLOBALE
 // ══════════════════════════════════════════════
 let allPercorsi = [];
+let routeDates = [];
 let currentPercorsoIdx = 0;
 let currentRoute = [];
 let selectedDay = 0;
@@ -2003,9 +2011,15 @@ function nearestNeighbor(list) {
   return route;
 }
 
-function splitDays(sorted, perDay) {
+// Restituisce le date lavorative (lun-sab) a partire da oggi
+function getWorkDays(numDays) {
   const days = [];
-  for (let d=0; d*perDay < sorted.length; d++) days.push(sorted.slice(d*perDay, (d+1)*perDay));
+  const d = new Date();
+  while (days.length < numDays) {
+    const dow = d.getDay(); // 0=dom, 6=sab
+    if (dow !== 0) days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
   return days;
 }
 
@@ -2013,32 +2027,61 @@ function buildRoute() {
   const prov = document.getElementById('prov-filter').value;
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
-  const totSlots = perDay * numDays;
 
-  // Escludi: escluse manualmente + visitate non ancora scadute
-  // Le assenti restano sempre nel pool (il routing geografico decide se includerle)
+  // Date reali dei giorni lavorativi
+  routeDates = getWorkDays(numDays);
+
+  // Pool base: escludi manuali + visitate non scadute
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(f.id)) return false;
     const fd = getFD(f.id);
-    // Verde: escludi finché frequenza non scaduta (anticipabile solo dalla scheda)
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     return true;
   });
 
+  // Costruisci percorso giorno per giorno
+  function buildDays(poolList) {
+    const days = [];
+    const usedIds = new Set();
+
+    for (let d = 0; d < numDays; d++) {
+      const dayDate = routeDates[d];
+      const dayStr = dayDate.toDateString();
+
+      // Prima: farmacie con appuntamento fissato per questo giorno
+      const pinned = poolList.filter(f => {
+        if (usedIds.has(f.id)) return false;
+        const fd = getFD(f.id);
+        if (!fd.dataAppuntamento) return false;
+        return new Date(fd.dataAppuntamento).toDateString() === dayStr;
+      });
+      pinned.forEach(f => usedIds.add(f.id));
+
+      // Poi: riempi con nearest neighbor dal pool libero
+      const free = poolList.filter(f => !usedIds.has(f.id));
+      const slots = Math.max(0, perDay - pinned.length);
+      const filled = nearestNeighbor([...free]).slice(0, slots);
+      filled.forEach(f => usedIds.add(f.id));
+
+      // Ottimizza l'ordine geografico del giorno completo
+      const dayFarmacie = nearestNeighbor([...pinned, ...filled]);
+      days.push(dayFarmacie);
+    }
+    return days;
+  }
+
   // A — Ottimale
-  const percA = splitDays(nearestNeighbor([...pool]).slice(0, totSlots), perDay);
+  const percA = buildDays([...pool]);
 
   // B — Top client prima
   const topP = pool.filter(f => getFD(f.id).isTop);
   const normP = pool.filter(f => !getFD(f.id).isTop);
-  const percB = splitDays([...nearestNeighbor(topP), ...nearestNeighbor(normP)].slice(0,totSlots), perDay);
+  const percB = buildDays([...topP, ...normP]);
 
   // C — Scadenze (chi non vede da più tempo)
   const scadPool = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
-  const percC = [];
-  let rem = [...scadPool];
-  for (let d=0; d<numDays && rem.length; d++) percC.push(nearestNeighbor(rem.splice(0, perDay)));
+  const percC = buildDays(scadPool);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
@@ -2078,10 +2121,16 @@ function selectPercorso(idx) {
 function renderDayTabs() {
   const scroller = document.getElementById('day-scroller');
   scroller.innerHTML = '';
+  const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  const mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   currentRoute.forEach((day, i) => {
     const btn = document.createElement('button');
     btn.className = 'day-btn' + (i===0?' active':'');
-    btn.textContent = `Giorno ${i+1} (${day.length})`;
+    const d = routeDates[i];
+    const label = d
+      ? `${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
+      : `Giorno ${i+1} (${day.length})`;
+    btn.textContent = label;
     btn.onclick = () => {
       document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -2985,6 +3034,11 @@ window.addEventListener('load', () => {
   renderScadenze();
   renderRichiami();
   generatePWAIcon();
+
+  // SERVICE WORKER
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/FarmaRete/sw.js').catch(() => {});
+  }
 
   // TAP FEEDBACK su tutti i bottoni
   document.addEventListener('click', e => {
