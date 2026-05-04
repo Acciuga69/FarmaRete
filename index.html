@@ -2981,6 +2981,30 @@ window.addEventListener('load', () => {
   renderRichiami();
   generatePWAIcon();
 
+  // ── SERVICE WORKER (PWA persistente) ──
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => self.clients.claim());
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.open('farmarete-v1').then(cache =>
+      cache.match(e.request).then(cached => {
+        const fresh = fetch(e.request).then(resp => {
+          if (resp && resp.status === 200) cache.put(e.request, resp.clone());
+          return resp;
+        });
+        return cached || fresh;
+      })
+    )
+  );
+});
+`;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl).catch(() => {});
+  }
+
   // TAP FEEDBACK su tutti i bottoni
   document.addEventListener('click', e => {
     const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-pill, .btn-esito, .pa-tab, .maps-btn, .btn-riammetti');
