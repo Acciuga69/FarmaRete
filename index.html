@@ -2059,31 +2059,9 @@ function buildRoute() {
   const prov = document.getElementById('prov-filter').value;
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
+  const todayYMD = toYMD(new Date());
 
-  // Date reali dei giorni lavorativi
-  routeDates = getWorkDays(numDays);
-
-  // Pool base: escludi manuali + visitate non scadute
-  // ECCEZIONE: farmacie con appuntamento futuro entrano sempre nel pool
-  const oggi = new Date(); oggi.setHours(0,0,0,0);
-  const pool = FARMACIE.filter(f => {
-    if (prov !== 'ALL' && f.p !== prov) return false;
-    if (escluseIds.has(String(f.id))) return false;
-    const fd = getFD(f.id);
-    // Se ha un appuntamento futuro, includi sempre
-    if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= new Date().toISOString().slice(0,10)) return true;
-    if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
-    // Assente: escludi per 3 giorni
-    if (fd.stato === 'assente' && fd.dataVisita) {
-      const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
-      if (gg < 3) return false;
-    }
-    return true;
-  });
-
-
-
-  // Calcola le date di una settimana dato un offset
+  // Calcola date della settimana corrente (con offset)
   function getWeekDates(weekOffset) {
     const dates = [];
     const start = new Date();
@@ -2100,20 +2078,54 @@ function buildRoute() {
     return dates;
   }
 
-  // Costruisce i giorni di UNA settimana
-  function buildDays(poolList, preUsed, weekDates) {
+  // Date della settimana visualizzata
+  routeDates = getWeekDates(routeWeekOffset);
+  const weekStrs = routeDates.map(d => toYMD(d));
+
+  // Pool base: farmacie senza appuntamento futuro, filtrate per provincia
+  const pool = FARMACIE.filter(f => {
+    if (prov !== 'ALL' && f.p !== prov) return false;
+    if (escluseIds.has(String(f.id))) return false;
+    const fd = getFD(f.id);
+    // Escludi se ha appuntamento futuro (verrà aggiunto come pinned)
+    if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
+    // Escludi se visitata non scaduta
+    if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
+    // Escludi assente per 3 giorni
+    if (fd.stato === 'assente' && fd.dataVisita) {
+      const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+      if (gg < 3) return false;
+    }
+    return true;
+  });
+
+  // Costruisce i giorni per le settimane precedenti (solo per usedIds)
+  const preUsed = new Set();
+  for (let w = 0; w < routeWeekOffset; w++) {
+    const wDates = getWeekDates(w);
+    const wStrs = wDates.map(d => toYMD(d));
+    for (let d = 0; d < numDays; d++) {
+      // pinned di settimane passate
+      FARMACIE.forEach(f => {
+        const fd = getFD(f.id);
+        if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === wStrs[d]) preUsed.add(String(f.id));
+      });
+      // filled di settimane passate
+      pool.filter(f => !preUsed.has(String(f.id))).slice(0, perDay).forEach(f => preUsed.add(String(f.id)));
+    }
+  }
+
+  // Costruisce i giorni della settimana corrente
+  function buildWeek(poolList, preUsedIds) {
     const days = [];
-    const usedIds = new Set(preUsed || []);
-    const todayYMD = toYMD(new Date());
+    const usedIds = new Set(preUsedIds);
 
     for (let d = 0; d < numDays; d++) {
-      const dayStr = toYMD(weekDates[d]);
+      const dayStr = weekStrs[d];
 
-      // STEP 1: farmacie con appuntamento esattamente per questo giorno
-      // Cerca in TUTTE le farmacie (non solo poolList) per non perdere appuntamenti
+      // APPUNTAMENTI: cerca in TUTTE le farmacie, ignora filtro provincia
       const pinned = FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
-        if (prov !== 'ALL' && f.p !== prov) return false;
         if (escluseIds.has(String(f.id))) return false;
         const fd = getFD(f.id);
         if (!fd.dataAppuntamento) return false;
@@ -2121,47 +2133,23 @@ function buildRoute() {
       });
       pinned.forEach(f => usedIds.add(String(f.id)));
 
-      // STEP 2: riempi con farmacie senza appuntamento futuro
-      const free = poolList.filter(f => {
-        if (usedIds.has(String(f.id))) return false;
-        const fd = getFD(f.id);
-        // Escludi se ha appuntamento futuro (andrà nel suo giorno)
-        if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-        return true;
-      });
+      // RIEMPI con pool normale
+      const free = poolList.filter(f => !usedIds.has(String(f.id)));
       const slots = Math.max(0, perDay - pinned.length);
       const filled = nearestNeighbor([...free]).slice(0, slots);
       filled.forEach(f => usedIds.add(String(f.id)));
 
       days.push(nearestNeighbor([...pinned, ...filled]));
     }
-    return { days, usedIds };
+    return days;
   }
 
-  // Costruisce tutte le settimane fino all'offset e restituisce l'ultima
-  function buildAllWeeks(poolList) {
-    let usedIds = new Set();
-    let result = { days: [] };
-    for (let w = 0; w <= routeWeekOffset; w++) {
-      const weekDates = getWeekDates(w);
-      if (w === routeWeekOffset) routeDates = weekDates;
-      result = buildDays(poolList, usedIds, weekDates);
-      usedIds = result.usedIds;
-    }
-    return result.days;
-  }
-
-  // A — Ottimale
-  const percA = buildAllWeeks([...pool]);
-
-  // B — Top client prima
+  const percA = buildWeek([...pool], preUsed);
   const topP = pool.filter(f => getFD(f.id).isTop);
   const normP = pool.filter(f => !getFD(f.id).isTop);
-  const percB = buildAllWeeks([...topP, ...normP]);
-
-  // C — Scadenze (chi non vede da più tempo)
+  const percB = buildWeek([...topP, ...normP], preUsed);
   const scadPool = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
-  const percC = buildAllWeeks(scadPool);
+  const percC = buildWeek(scadPool, preUsed);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
