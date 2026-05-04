@@ -2067,16 +2067,41 @@ function buildRoute() {
 
   const localStr = dt => `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
 
-  // Costruisce i giorni di UNA settimana, escludendo farmacie già usate
-  function buildDays(poolList, preUsed) {
+  // Calcola le date di una settimana dato un offset
+  function getWeekDates(weekOffset) {
+    const dates = [];
+    const start = new Date();
+    start.setDate(start.getDate() + weekOffset * 7);
+    if (weekOffset > 0) {
+      const dow = start.getDay();
+      if (dow !== 1) start.setDate(start.getDate() + (dow === 0 ? 1 : 8 - dow));
+    }
+    const tmp = new Date(start);
+    while (dates.length < numDays) {
+      if (tmp.getDay() !== 0) dates.push(new Date(tmp));
+      tmp.setDate(tmp.getDate() + 1);
+    }
+    return dates;
+  }
+
+  // Costruisce i giorni di UNA settimana
+  function buildDays(poolList, preUsed, weekDates) {
     const days = [];
     const usedIds = new Set(preUsed || []);
+    const weekStrs = weekDates.map(d => localStr(d));
+
+    // Pool filtrato per questa settimana:
+    // - senza appuntamento: normale frequenza
+    // - con appuntamento in questa settimana: includi come pinned
+    // - con appuntamento in settimana futura: escludi (non ancora il momento)
+    // - con appuntamento scaduto (passato, non visitato): includi come normale
+    const weekStart = weekDates[0]; weekStart.setHours(0,0,0,0);
+    const weekEnd = new Date(weekDates[weekDates.length-1]); weekEnd.setHours(23,59,59,999);
 
     for (let d = 0; d < numDays; d++) {
-      const dayDate = routeDates[d];
-      const dayStr = localStr(dayDate);
+      const dayStr = weekStrs[d];
 
-      // Prima: farmacie con appuntamento fissato per questo giorno
+      // Prima: farmacie con appuntamento fissato ESATTAMENTE per questo giorno
       const pinned = poolList.filter(f => {
         if (usedIds.has(f.id)) return false;
         const fd = getFD(f.id);
@@ -2085,8 +2110,17 @@ function buildRoute() {
       });
       pinned.forEach(f => usedIds.add(f.id));
 
-      // Poi: riempi con nearest neighbor dal pool libero
-      const free = poolList.filter(f => !usedIds.has(f.id));
+      // Poi: riempi con farmacie senza appuntamento futuro o con appuntamento scaduto
+      const free = poolList.filter(f => {
+        if (usedIds.has(f.id)) return false;
+        const fd = getFD(f.id);
+        if (fd.dataAppuntamento) {
+          const apptDate = new Date(fd.dataAppuntamento);
+          // Escludi se l'appuntamento è in questa o futura settimana ma non oggi
+          if (apptDate >= weekStart) return false;
+        }
+        return true;
+      });
       const slots = Math.max(0, perDay - pinned.length);
       const filled = nearestNeighbor([...free]).slice(0, slots);
       filled.forEach(f => usedIds.add(f.id));
@@ -2101,25 +2135,10 @@ function buildRoute() {
     let usedIds = new Set();
     let result = { days: [] };
     for (let w = 0; w <= routeWeekOffset; w++) {
-      // Per ogni settimana aggiorna le date
-      const savedDates = routeDates;
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() + w * 7);
-      if (w > 0) {
-        // Porta al lunedì della settimana target
-        const dow = weekStart.getDay();
-        if (dow !== 1) weekStart.setDate(weekStart.getDate() + (dow === 0 ? 1 : 8 - dow));
-      }
-      const weekDates = [];
-      const tmp = new Date(weekStart);
-      while (weekDates.length < numDays) {
-        if (tmp.getDay() !== 0) weekDates.push(new Date(tmp));
-        tmp.setDate(tmp.getDate() + 1);
-      }
+      const weekDates = getWeekDates(w);
       if (w === routeWeekOffset) routeDates = weekDates;
-      result = buildDays(poolList, usedIds);
+      result = buildDays(poolList, usedIds, weekDates);
       usedIds = result.usedIds;
-      if (w < routeWeekOffset) routeDates = savedDates;
     }
     return result.days;
   }
@@ -2697,14 +2716,16 @@ function saveModal() {
   setFD(currentFarmaciaId, update);
   closeModal();
   autoUploadAfterSave();
-  // Aggiorna SEMPRE dashboard e badges, indipendentemente dalla pagina attiva
   refreshDashboard();
   updateBadges();
-  // Aggiorna anche la pagina corrente se non è già la dashboard
+  // Se è cambiato qualcosa che influenza il routing, rigenera il percorso
+  if (update.dataAppuntamento !== undefined || update.stato || update.frequenza || update.isTop !== undefined) {
+    buildRoute();
+  }
+  // Aggiorna anche la pagina corrente
   const activePage = document.querySelector('.page.active');
   if (activePage) {
     if (activePage.id==='page-farmacie') renderFarmacie();
-    if (activePage.id==='page-percorso') renderDayList(selectedDay);
     if (activePage.id==='page-scadenze') renderScadenze();
     if (activePage.id==='page-richiami') renderRichiami();
   }
