@@ -2000,6 +2000,23 @@ async function geocodeStart(address) {
   return false;
 }
 
+function nearestNeighborFrom(list, from) {
+  const unvisited = [...list];
+  const route = [];
+  let current = from || { lat: startPoint.lat, lng: startPoint.lng };
+  while (unvisited.length) {
+    let bi=0, bd=Infinity;
+    for (let i=0; i<unvisited.length; i++) {
+      const c = COORDS[unvisited[i].loc] || current;
+      const d = dist(current, c);
+      if (d < bd) { bd=d; bi=i; }
+    }
+    route.push(unvisited.splice(bi,1)[0]);
+    current = COORDS[route[route.length-1].loc] || current;
+  }
+  return route;
+}
+
 function nearestNeighbor(list) {
   const unvisited = [...list];
   const route = [];
@@ -2082,6 +2099,23 @@ function buildRoute() {
   routeDates = getWeekDates(routeWeekOffset);
   const weekStrs = routeDates.map(d => toYMD(d));
 
+  // DEBUG: mostra appuntamenti trovati questa settimana
+  const debugAppts = FARMACIE.filter(f => {
+    const fd = getFD(f.id);
+    return fd.dataAppuntamento && weekStrs.includes(toYMD(fd.dataAppuntamento));
+  });
+  let debugEl = document.getElementById('debug-appts');
+  if (!debugEl) {
+    debugEl = document.createElement('div');
+    debugEl.id = 'debug-appts';
+    debugEl.style = 'background:#fff3cd;padding:8px 12px;border-radius:8px;font-size:0.75rem;margin:4px 0;';
+    const container = document.getElementById('route-list-label');
+    if (container && container.parentNode) container.parentNode.insertBefore(debugEl, container);
+  }
+  debugEl.textContent = debugAppts.length > 0
+    ? '📅 Appuntamenti questa settimana: ' + debugAppts.map(f => (getFD(f.id).nomeCustom || f.nome) + ' → ' + toYMD(getFD(f.id).dataAppuntamento)).join(' | ')
+    : '📅 Nessun appuntamento trovato questa settimana (weekStrs: ' + weekStrs.join(', ') + ')';
+
   // Pool base: farmacie senza appuntamento futuro, filtrate per provincia
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
@@ -2115,31 +2149,71 @@ function buildRoute() {
     }
   }
 
+  // Calcola centroide di un gruppo di farmacie
+  function centroide(farmacie) {
+    const coords = farmacie.map(f => COORDS[f.loc]).filter(Boolean);
+    if (!coords.length) return { lat: startPoint.lat, lng: startPoint.lng };
+    return {
+      lat: coords.reduce((s,c) => s+c.lat, 0) / coords.length,
+      lng: coords.reduce((s,c) => s+c.lng, 0) / coords.length
+    };
+  }
+
   // Costruisce i giorni della settimana corrente
   function buildWeek(poolList, preUsedIds) {
     const days = [];
     const usedIds = new Set(preUsedIds);
 
-    for (let d = 0; d < numDays; d++) {
-      const dayStr = weekStrs[d];
-
-      // APPUNTAMENTI: cerca in TUTTE le farmacie, ignora filtro provincia
-      const pinned = FARMACIE.filter(f => {
+    // STEP 1: raccogli tutti gli appuntamenti della settimana per giorno
+    const pinnedPerDay = weekStrs.map(dayStr =>
+      FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
         if (escluseIds.has(String(f.id))) return false;
         const fd = getFD(f.id);
-        if (!fd.dataAppuntamento) return false;
-        return toYMD(fd.dataAppuntamento) === dayStr;
+        return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
+      })
+    );
+    pinnedPerDay.forEach(pinned => pinned.forEach(f => usedIds.add(String(f.id))));
+
+    // STEP 2: distribuisci le farmacie rimanenti in cluster geografici per giorno
+    const remaining = poolList.filter(f => !usedIds.has(String(f.id)));
+
+    // Calcola centroide per ogni giorno (basato su appuntamenti o distribuzione uniforme)
+    const dayCentroids = pinnedPerDay.map((pinned, i) => {
+      if (pinned.length > 0) return centroide(pinned);
+      // Senza appuntamenti: distribuisci uniformemente per area geografica
+      const sorted = [...remaining].sort((a,b) => {
+        const ca = COORDS[a.loc] || {lat:0,lng:0};
+        const cb = COORDS[b.loc] || {lat:0,lng:0};
+        return (ca.lat + ca.lng) - (cb.lat + cb.lng);
       });
-      pinned.forEach(f => usedIds.add(String(f.id)));
+      const chunk = Math.floor(sorted.length / numDays);
+      const slice = sorted.slice(i * chunk, (i+1) * chunk);
+      return centroide(slice.length ? slice : remaining);
+    });
 
-      // RIEMPI con pool normale
-      const free = poolList.filter(f => !usedIds.has(String(f.id)));
+    // STEP 3: assegna ogni farmacia al giorno con centroide più vicino
+    const dayPools = Array.from({length: numDays}, () => []);
+    const tmpUsed = new Set(usedIds);
+    remaining.forEach(f => {
+      const c = COORDS[f.loc] || dayCentroids[0];
+      let bestDay = 0, bestDist = Infinity;
+      dayCentroids.forEach((dc, i) => {
+        const d = dist(c, dc);
+        if (d < bestDist) { bestDist = d; bestDay = i; }
+      });
+      dayPools[bestDay].push(f);
+    });
+
+    // STEP 4: costruisci ogni giorno con pinned + pool del giorno (limite perDay)
+    for (let d = 0; d < numDays; d++) {
+      const pinned = pinnedPerDay[d];
       const slots = Math.max(0, perDay - pinned.length);
-      const filled = nearestNeighbor([...free]).slice(0, slots);
-      filled.forEach(f => usedIds.add(String(f.id)));
+      const dayFree = dayPools[d].slice(0, slots);
+      dayFree.forEach(f => usedIds.add(String(f.id)));
 
-      days.push(nearestNeighbor([...pinned, ...filled]));
+      const centro = pinned.length > 0 ? centroide(pinned) : centroide(dayFree);
+      days.push(nearestNeighborFrom([...pinned, ...dayFree], centro));
     }
     return days;
   }
@@ -2697,8 +2771,8 @@ function saveModal() {
   if (nomeCustom) update.nomeCustom = nomeCustom;
   // Data visita o appuntamento
   if (dataVisitaInput) {
-    const oggi = new Date().toISOString().slice(0,10); // YYYY-MM-DD locale
-    if (dataVisitaInput > oggi) {
+    const oggi = toYMD(new Date()); // YYYY-MM-DD in ora locale
+    if (dataVisitaInput >= oggi) { // >= include anche oggi
       update.dataAppuntamento = dataVisitaInput; // salva come YYYY-MM-DD puro
       update.dataVisita = null;
     } else {
