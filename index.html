@@ -2275,12 +2275,12 @@ function buildRoute() {
 
   // Priorità farmacia (1=massima)
   function priority(f) {
-    const fd = getFD(f.id);
-    if (fd.stato === 'richiamare') return 1;
-    if (fd.isTop && isScaduta(f.id)) return 2;
-    if (isScaduta(f.id)) return 3;
-    if (fd.isTop) return 4;
-    return 5;
+    const fd = _getFD(f.id);
+    if (fd.stato === 'richiamare') return 1;           // da richiamare
+    if (fd.isTop && isScaduta(f.id)) return 2;        // top + scaduto
+    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3; // scaduti e potenziali miscelati
+    if (fd.isTop) return 4;                           // top non scaduto
+    return 5;                                         // normali
   }
 
   // Pool base: senza appuntamenti futuri, senza visitati/assenti recenti
@@ -2340,25 +2340,34 @@ function buildRoute() {
         return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
       }).sort((a,b) => {
         // Ordina per orario appuntamento se disponibile
-        const ta = getFD(a.id).oraAppuntamento || '23:59';
-        const tb = getFD(b.id).oraAppuntamento || '23:59';
+        const ta = _getFD(a.id).oraAppuntamento || '23:59';
+        const tb = _getFD(b.id).oraAppuntamento || '23:59';
         return ta.localeCompare(tb);
       });
       pinned.forEach(f => usedIds.add(String(f.id)));
 
       // STEP 2: determina zone attive del giorno
-      // Primary zone + eventuale secondary se compatibile
-      const activeZones = new Set([primaryZone]);
+      // SE ci sono appuntamenti, la zona del giorno segue la zona degli appuntamenti
+      // (non il calendario fisso giorno/zona)
+      let effectiveZone = primaryZone;
+      if (pinned.length > 0) {
+        // Conta quale zona è più rappresentata tra gli appuntamenti
+        const zoneCount = {};
+        pinned.forEach(f => { zoneCount[f.p] = (zoneCount[f.p]||0) + 1; });
+        effectiveZone = Object.entries(zoneCount).sort((a,b) => b[1]-a[1])[0][0];
+      }
+
+      const activeZones = new Set([effectiveZone]);
       pinned.forEach(f => {
-        if (f.p !== primaryZone) {
-          const key = primaryZone + '+' + f.p;
-          const keyRev = f.p + '+' + primaryZone;
+        if (f.p !== effectiveZone) {
+          const key = effectiveZone + '+' + f.p;
+          const keyRev = f.p + '+' + effectiveZone;
           if (ZONE_COMPAT[key] || ZONE_COMPAT[keyRev]) {
             activeZones.add(f.p);
           }
           // MB+SO mai insieme
-          if ((primaryZone === 'MB' && f.p === 'SO') || (primaryZone === 'SO' && f.p === 'MB')) {
-            activeZones.delete(f.p); // rimuovi la zona incompatibile
+          if ((effectiveZone === 'MB' && f.p === 'SO') || (effectiveZone === 'SO' && f.p === 'MB')) {
+            activeZones.delete(f.p);
           }
         }
       });
@@ -2418,8 +2427,8 @@ function buildRoute() {
   // Tre varianti percorso
   const poolBase = [...pool];
   const poolTop = [...pool].sort((a,b) => {
-    const pa = (getFD(a.id).isTop?0:10) + (isScaduta(a.id)?0:5);
-    const pb = (getFD(b.id).isTop?0:10) + (isScaduta(b.id)?0:5);
+    const pa = (_getFD(a.id).isTop?0:10) + (isScaduta(a.id)?0:5) + (_getFD(a.id).stato==='potenziale'?0:3);
+    const pb = (_getFD(b.id).isTop?0:10) + (isScaduta(b.id)?0:5) + (_getFD(b.id).stato==='potenziale'?0:3);
     return pa - pb;
   });
   const poolScad = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
@@ -2480,9 +2489,9 @@ function renderDayTabs() {
     const btn = document.createElement('button');
     const d = routeDates[i];
     const isToday = d && toYMD(d) === todayStr;
-    btn.className = 'day-btn' + (i===0?' active':'') + (isToday?' oggi':'');
+    btn.className = 'day-btn' + (i===0?' active':'');
     const label = d
-      ? `${isToday?'⭐ ':''}${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
+      ? `${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
       : `Giorno ${i+1} (${day.length})`;
     btn.textContent = label;
     btn.onclick = () => {
