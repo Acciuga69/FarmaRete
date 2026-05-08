@@ -704,6 +704,8 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   align-items: center;
   justify-content: center;
 }
+.day-btn.oggi { border-color: var(--amber) !important; color: var(--amber) !important; font-weight: 700; }
+.day-btn.oggi.active { background: var(--amber) !important; color: #fff !important; border-color: var(--amber) !important; }
 
 /* ── PHONE (<700px) ── */
 @media (max-width: 700px) {
@@ -2247,6 +2249,9 @@ function buildRoute() {
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
   const todayYMD = toYMD(new Date());
+  // Cache dei dati: evitiamo di leggere localStorage N volte
+  const _fdCache = loadData();
+  const _getFD = (id) => _fdCache[String(id)] || {};
 
   // Date della settimana
   function getWeekDates(offset) {
@@ -2282,7 +2287,7 @@ function buildRoute() {
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
-    const fd = getFD(f.id);
+    const fd = _getFD(f.id);
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     if (fd.stato === 'assente' && fd.dataVisita) {
@@ -2327,10 +2332,11 @@ function buildRoute() {
       const primaryZone = ZONE_DOW[dow] || 'MB';
 
       // STEP 1: appuntamenti del giorno (qualsiasi provincia)
+      // NOTA: gli appuntamenti ignorano l'esclusione temporanea (🚫) - hanno sempre la precedenza
       const pinned = FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
-        if (escluseIds.has(String(f.id))) return false;
-        const fd = getFD(f.id);
+        // NON controlliamo escluseIds qui: un appuntamento sovrascrive l'esclusione
+        const fd = _getFD(f.id);
         return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
       }).sort((a,b) => {
         // Ordina per orario appuntamento se disponibile
@@ -2469,12 +2475,14 @@ function renderDayTabs() {
   scroller.innerHTML = '';
   const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
   const mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  const todayStr = toYMD(new Date());
   currentRoute.forEach((day, i) => {
     const btn = document.createElement('button');
-    btn.className = 'day-btn' + (i===0?' active':'');
     const d = routeDates[i];
+    const isToday = d && toYMD(d) === todayStr;
+    btn.className = 'day-btn' + (i===0?' active':'') + (isToday?' oggi':'');
     const label = d
-      ? `${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
+      ? `${isToday?'⭐ ':''}${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
       : `Giorno ${i+1} (${day.length})`;
     btn.textContent = label;
     btn.onclick = () => {
