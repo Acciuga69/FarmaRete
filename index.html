@@ -2157,7 +2157,7 @@ function changeWeek(dir) {
 // Zone per giorno della settimana (1=Lun...6=Sab)
 const ZONE_DOW = {1:'MB', 2:'LC', 3:'SO', 4:'MB', 5:'LC', 6:'SO'};
 // Coppie di zone compatibili nello stesso giorno (con pausa pranzo)
-const ZONE_COMPAT = {'MB+LC':true,'LC+MB':true,'LC+SO':true,'SO+LC':true};
+const ZONE_COMPAT = {'LC+SO':true,'SO+LC':true}; // MB resta sempre separato
 // Velocità media (km/h) per calcolo tempi
 const ROAD_SPEED_KMH = 50;
 const ROAD_FACTOR = 1.4;
@@ -2297,100 +2297,41 @@ function buildRoute() {
     return true;
   });
 
-  // Costruisce il percorso settimanale con logica zone
-  function buildWeekZone(poolSorted) {
+  // Costruisce il percorso: niente zone, solo GPS + priorità + distanza
+  // Tu escludi quello che non vuoi → l'app ottimizza quello che rimane
+  function buildDays(poolSorted) {
     const days = [];
     const usedIds = new Set();
 
-    // Pre-calcola settimane precedenti per usedIds
-    for (let w = 0; w < routeWeekOffset; w++) {
-      const wDates = getWeekDates(w);
-      const wStrs = wDates.map(d => toYMD(d));
-      // Segna appuntamenti settimane passate come usati
-      FARMACIE.forEach(f => {
-        const fd = getFD(f.id);
-        if (fd.dataAppuntamento && wStrs.includes(toYMD(fd.dataAppuntamento))) {
-          usedIds.add(String(f.id));
-        }
-      });
-      // Segna farmacie assegnate nelle settimane precedenti
-      let wUsed = new Set(usedIds);
-      for (let d = 0; d < numDays; d++) {
-        const dow = wDates[d].getDay();
-        const zone = ZONE_DOW[dow] || 'MB';
-        poolSorted.filter(f => f.p === zone && !wUsed.has(String(f.id)))
-          .slice(0, perDay).forEach(f => {
-            wUsed.add(String(f.id));
-            usedIds.add(String(f.id));
-          });
-      }
-    }
-
     for (let d = 0; d < numDays; d++) {
       const dayStr = weekStrs[d];
-      const dow = routeDates[d].getDay();
-      const primaryZone = ZONE_DOW[dow] || 'MB';
 
-      // STEP 1: appuntamenti del giorno (qualsiasi provincia)
-      // NOTA: gli appuntamenti ignorano l'esclusione temporanea (🚫) - hanno sempre la precedenza
+      // STEP 1: appuntamenti del giorno — sempre presenti, ignorano le esclusioni
       const pinned = FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
-        // NON controlliamo escluseIds qui: un appuntamento sovrascrive l'esclusione
         const fd = _getFD(f.id);
         return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
       }).sort((a,b) => {
-        // Ordina per orario appuntamento se disponibile
         const ta = _getFD(a.id).oraAppuntamento || '23:59';
         const tb = _getFD(b.id).oraAppuntamento || '23:59';
         return ta.localeCompare(tb);
       });
       pinned.forEach(f => usedIds.add(String(f.id)));
 
-      // STEP 2: determina zone attive del giorno
-      // SE ci sono appuntamenti, la zona del giorno segue la zona degli appuntamenti
-      // (non il calendario fisso giorno/zona)
-      let effectiveZone = primaryZone;
-      if (pinned.length > 0) {
-        // Conta quale zona è più rappresentata tra gli appuntamenti
-        const zoneCount = {};
-        pinned.forEach(f => { zoneCount[f.p] = (zoneCount[f.p]||0) + 1; });
-        effectiveZone = Object.entries(zoneCount).sort((a,b) => b[1]-a[1])[0][0];
-      }
-
-      const activeZones = new Set([effectiveZone]);
-      pinned.forEach(f => {
-        if (f.p !== effectiveZone) {
-          const key = effectiveZone + '+' + f.p;
-          const keyRev = f.p + '+' + effectiveZone;
-          if (ZONE_COMPAT[key] || ZONE_COMPAT[keyRev]) {
-            activeZones.add(f.p);
-          }
-          // MB+SO mai insieme
-          if ((effectiveZone === 'MB' && f.p === 'SO') || (effectiveZone === 'SO' && f.p === 'MB')) {
-            activeZones.delete(f.p);
-          }
-        }
-      });
-
-      // STEP 3: riempi con priorità e vincolo 40 min
-      const slots = Math.max(0, perDay - pinned.length);
+      // STEP 2: parte dal punto GPS (ogni giorno riparte da casa/ufficio)
       const dayRoute = [...pinned];
       let currentLoc = pinned.length > 0
-        ? pinned[pinned.length-1].loc
+        ? pinned[pinned.length - 1].loc
         : startPoint.label;
 
-      // Pool del giorno filtrato per zone e non usato
-      const dayPool = poolSorted.filter(f =>
-        !usedIds.has(String(f.id)) && activeZones.has(f.p)
-      );
+      // STEP 3: riempi con nearest-neighbor per priorità, senza filtri di zona
+      const remaining = poolSorted.filter(f => !usedIds.has(String(f.id)));
 
-      // Aggiungi farmacie rispettando max 40 min e priorità
-      const remaining = [...dayPool];
       while (dayRoute.length < perDay && remaining.length > 0) {
         let chosen = null;
         let chosenIdx = -1;
 
-        // Prima cerca tra priorità 1-3 entro 40 min
+        // Cerca per priorità crescente entro MAX_TRAVEL_MIN
         for (let pri = 1; pri <= 5; pri++) {
           const candidates = remaining
             .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
@@ -2402,7 +2343,7 @@ function buildRoute() {
             break;
           }
         }
-        // Se non trova entro 40 min, prendi il più vicino per priorità
+        // Fallback: il più vicino per priorità senza limite distanza
         if (!chosen) {
           const byPri = remaining
             .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
@@ -2433,9 +2374,9 @@ function buildRoute() {
   });
   const poolScad = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
 
-  const percA = buildWeekZone(poolBase);
-  const percB = buildWeekZone(poolTop);
-  const percC = buildWeekZone(poolScad);
+  const percA = buildDays(poolBase);
+  const percB = buildDays(poolTop);
+  const percC = buildDays(poolScad);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
