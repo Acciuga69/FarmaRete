@@ -1098,6 +1098,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       </div>
       <div class="controls-row">
         <button class="btn btn-green" onclick="buildRoute()">⚙ Genera percorsi</button>
+        <button class="btn" style="font-size:0.75rem;padding:8px;" onclick="diagAppt()">🔍 Debug</button>
         <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
           <button class="btn" style="padding:8px 12px;font-size:0.85rem;" onclick="changeWeek(-1)">◀</button>
           <span id="week-label" style="font-size:0.78rem;font-weight:600;color:var(--ink2);white-space:nowrap;">Sett. corrente</span>
@@ -2115,6 +2116,28 @@ function renderApptStrip() {
       <span style="font-size:0.62rem;color:var(--ink3);">${f.loc}</span>
     </div>`;
   }).join('');
+}
+
+function diagAppt() {
+  const today = toYMD(new Date());
+  const appts = FARMACIE.map(f => {
+    const fd = getFD(f.id);
+    return { id: f.id, nome: f.n, appt: fd.dataAppuntamento, visita: fd.dataVisita, stato: fd.stato };
+  }).filter(x => x.appt);
+  const weekStr = routeDates ? routeDates.map(d => toYMD(d)).join(', ') : 'non calcolate';
+  let msg = '=== DIAGNOSTICA APPUNTAMENTI ===\n';
+  msg += 'Oggi: ' + today + '\n';
+  msg += 'Settimana: ' + weekStr + '\n\n';
+  if (appts.length === 0) {
+    msg += 'NESSUN APPUNTAMENTO TROVATO NEL DATABASE\n';
+    msg += 'Verifica che la data sia salvata correttamente.';
+  } else {
+    appts.forEach(a => {
+      const match = routeDates ? routeDates.some(d => toYMD(d) === toYMD(a.appt)) : false;
+      msg += `${a.nome}\n  Data: ${a.appt}\n  In settimana: ${match?'✅ SÌ':'❌ NO'}\n\n`;
+    });
+  }
+  alert(msg);
 }
 
 function changeWeek(dir) {
