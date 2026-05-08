@@ -2486,11 +2486,21 @@ function renderDayList(dayIdx) {
       ? `<span style="font-size:0.66rem;color:var(--green);font-weight:700;">${apptLabel}</span>`
       : gg < Infinity ? `<span style="font-size:0.66rem;color:${scad?'var(--red)':'var(--ink3)'};">${scad?'⏰ ':''} ${gg}g fa</span>` : '';
 
+    // Badge tipo cliente
+    const clienteBadge = isTop
+      ? `<span style="font-size:0.65rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:6px;">⭐ TOP</span>`
+      : fd.isCliente
+        ? `<span style="font-size:0.65rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:6px;">🤝 CLI</span>`
+        : fd.isProspect || fd.stato==='potenziale'
+          ? `<span style="font-size:0.65rem;font-weight:700;background:#2196f3;color:#fff;padding:1px 5px;border-radius:6px;">🔍 POT</span>`
+          : '';
+
     item.innerHTML = `
       <div class="route-num" style="background:${numColor};">${numLabel}</div>
       <div class="route-info" onclick="openModal(${f.id})">
-        <div class="route-name" style="display:flex;align-items:center;gap:6px;">
-          <span>${isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${getFD(f.id).nomeCustom||f.n}</span>
+        <div class="route-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span>${getFD(f.id).nomeCustom||f.n}</span>
+          ${clienteBadge}
           <span style="font-size:0.7rem;color:var(--ink3);font-weight:400;margin-left:auto;">${oraAppt || oraStimata}</span>
         </div>
         <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
@@ -2506,7 +2516,10 @@ function renderDayList(dayIdx) {
     list.appendChild(item);
   });
 
-  document.getElementById('map-toolbar-info').innerHTML = `📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate`;
+  document.getElementById('map-toolbar-info').innerHTML = `
+    📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate
+    &nbsp;<button onclick="ricalcolaGiorno(${dayIdx})" style="font-size:0.72rem;padding:2px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;">🔄 Ricalcola</button>
+  `;
   showMapsPanel(dayIdx);
 }
 
@@ -2601,6 +2614,98 @@ function ripristinaFarmacia(id) {
   saveEscluse();
   buildRoute();
 }
+function ricalcolaGiorno(dayIdx) {
+  // Ricalcola solo il giorno selezionato mantenendo gli altri invariati
+  const todayYMD = toYMD(new Date());
+  const _fdCache = loadData();
+  const _getFD = (id) => _fdCache[String(id)] || {};
+
+  // Raccogli ID usati dagli altri giorni (non dayIdx)
+  const usedByOthers = new Set();
+  currentRoute.forEach((day, i) => {
+    if (i !== dayIdx) day.forEach(f => usedByOthers.add(String(f.id)));
+  });
+
+  // Pool disponibile per quel giorno
+  const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
+  const perDay = parseInt(document.getElementById('per-day').value) || 7;
+
+  // Appuntamenti del giorno (fissi)
+  const pinned = FARMACIE.filter(f => {
+    const fd = _getFD(f.id);
+    return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
+  }).sort((a,b) => (_getFD(a.id).oraAppuntamento||'23:59').localeCompare(_getFD(b.id).oraAppuntamento||'23:59'));
+
+  const pinnedIds = new Set(pinned.map(f => String(f.id)));
+
+  // Pool libero
+  const pool = FARMACIE.filter(f => {
+    if (usedByOthers.has(String(f.id))) return false;
+    if (pinnedIds.has(String(f.id))) return false;
+    if (escluseIds.has(String(f.id))) return false;
+    const fd = _getFD(f.id);
+    if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
+    if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
+    if (fd.stato === 'assente' && fd.dataVisita) {
+      const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+      if (gg < 3) return false;
+    }
+    return true;
+  });
+
+  // Funzione priorità locale
+  const pri = (f) => {
+    const fd = _getFD(f.id);
+    if (fd.stato === 'richiamare') return 1;
+    if (fd.isTop && isScaduta(f.id)) return 2;
+    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3;
+    if (fd.isTop) return 4;
+    return 5;
+  };
+
+  // Costruisci nuovo giorno con nearest-neighbor
+  const newDay = [...pinned];
+  const usedDay = new Set(pinned.map(f => String(f.id)));
+  let currentLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
+  const remaining = [...pool];
+
+  // Mischia leggermente per dare un'alternativa (Fisher-Yates)
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+
+  while (newDay.length < perDay && remaining.length > 0) {
+    let chosen = null, chosenIdx = -1;
+    for (let p = 1; p <= 5; p++) {
+      const cands = remaining
+        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
+        .filter(x => pri(x.f)===p && x.t<=MAX_TRAVEL_MIN);
+      if (cands.length > 0) {
+        cands.sort((a,b) => a.t-b.t);
+        chosen = cands[0].f; chosenIdx = cands[0].i; break;
+      }
+    }
+    if (!chosen) {
+      const byPri = remaining
+        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
+        .sort((a,b) => pri(a.f)-pri(b.f) || a.t-b.t);
+      if (byPri.length) { chosen=byPri[0].f; chosenIdx=byPri[0].i; }
+    }
+    if (!chosen) break;
+    remaining.splice(chosenIdx,1);
+    newDay.push(chosen);
+    usedDay.add(String(chosen.id));
+    currentLoc = chosen.loc;
+  }
+
+  // Aggiorna solo quel giorno in tutti i percorsi
+  allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = newDay; });
+  currentRoute[dayIdx] = newDay;
+  renderDayTabs();
+  renderDayList(dayIdx);
+}
+
 function renderEscluse() {
   const panel = document.getElementById('escluse-panel');
   const list = document.getElementById('escluse-list');
