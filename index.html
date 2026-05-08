@@ -1117,6 +1117,17 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 
     <div class="day-scroller" id="day-scroller"></div>
 
+    <!-- Striscia appuntamenti collassabile -->
+    <div id="appt-strip" style="display:none;background:var(--card);border-bottom:1px solid var(--border);">
+      <div onclick="toggleApptStrip()" style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;cursor:pointer;user-select:none;">
+        <span style="font-size:0.75rem;font-weight:700;color:var(--green);">📅 Appuntamenti settimana</span>
+        <span id="appt-strip-arrow" style="font-size:0.7rem;color:var(--ink3);">▼</span>
+      </div>
+      <div id="appt-strip-body" style="display:none;padding:0 8px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="appt-strip-list" style="display:flex;flex-wrap:nowrap;gap:6px;width:max-content;padding-bottom:2px;"></div>
+      </div>
+    </div>
+
     <div class="percorso-body">
       <div class="route-list-wrap">
         <div class="route-list-header">
@@ -1128,9 +1139,9 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         </div>
         <!-- Pannello farmacie escluse -->
         <div id="escluse-panel">
-          <div class="escluse-hdr" onclick="toggleEscluse()">
-            <span>🚫 Escluse (<span id="escluse-count">0</span>)</span>
-            <span id="escluse-arrow">▲</span>
+          <div class="escluse-hdr" onclick="toggleEscluse()" style="padding:8px 12px;border-radius:8px;background:var(--bg);margin-bottom:4px;">
+            <span>🚫 Escluse dal giro (<span id="escluse-count">0</span>) — tocca per aprire</span>
+            <span id="escluse-arrow">▼</span>
           </div>
           <div class="escluse-list" id="escluse-list"></div>
         </div>
@@ -1232,10 +1243,14 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
           <div class="prio-chip" data-prio="freddo" onclick="setPrio('freddo')">🔵 Freddo</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;">
         <div class="modal-section-label" style="margin:0;">Top client</div>
         <button class="star-btn" id="modal-star" onclick="toggleTopModal()">☆</button>
         <span style="font-size:0.75rem;color:var(--ink3);">Visita ogni 45 giorni</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
+          <button id="modal-prospect-btn" onclick="toggleProspectModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🔍 Prospect</button>
+        </div>
       </div>
       <div>
         <div class="modal-section-label">Frequenza visita (giorni)</div>
@@ -1243,8 +1258,11 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       </div>
       <div>
         <div class="modal-section-label">📅 Data visita / Appuntamento</div>
-        <input type="date" id="modal-data-visita" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;">
-        <div id="modal-data-hint" style="font-size:0.7rem;margin-top:4px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="modal-data-visita" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;">
+          <input type="time" id="modal-ora-appuntamento" style="width:100px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;" placeholder="09:00">
+        </div>
+        <div id="modal-data-hint" style="font-size:0.7rem;margin-top:4px;color:var(--ink3);">Data + ora appuntamento (opzionale)</div>
       </div>
       <div>
         <div class="modal-section-label">Note visita</div>
@@ -2054,6 +2072,51 @@ function getWorkDays(numDays) {
   return days;
 }
 
+// ── STRISCIA APPUNTAMENTI ──
+function toggleApptStrip() {
+  const body = document.getElementById('appt-strip-body');
+  const arrow = document.getElementById('appt-strip-arrow');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▼' : '▲';
+}
+
+function renderApptStrip() {
+  const strip = document.getElementById('appt-strip');
+  const list = document.getElementById('appt-strip-list');
+  if (!strip || !list) return;
+
+  const todayYMD = toYMD(new Date());
+  const appts = FARMACIE.map(f => {
+    const fd = getFD(f.id);
+    if (!fd.dataAppuntamento || fd.dataAppuntamento < todayYMD) return null;
+    // Trova il giorno della settimana
+    const dayIdx = routeDates ? routeDates.findIndex(d => toYMD(d) === fd.dataAppuntamento) : -1;
+    return { f, fd, dayIdx };
+  }).filter(Boolean);
+
+  if (appts.length === 0) {
+    strip.style.display = 'none';
+    return;
+  }
+
+  strip.style.display = 'block';
+  const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+
+  list.innerHTML = appts.map(({ f, fd, dayIdx }) => {
+    const d = routeDates && routeDates[dayIdx] ? routeDates[dayIdx] : null;
+    const dayLabel = d ? giorni[d.getDay()] + ' ' + d.getDate() : fd.dataAppuntamento;
+    const oraLabel = fd.oraAppuntamento ? ' ' + fd.oraAppuntamento : '';
+    const nome = fd.nomeCustom || f.n;
+    const zone = f.p === 'MB' ? 'badge-mb' : f.p === 'LC' ? 'badge-lc' : 'badge-so';
+    return `<div onclick="openModal(${f.id})" style="display:inline-flex;flex-direction:column;padding:5px 10px;background:${dayIdx>=0?'#e8f5e9':'#fff3cd'};border:1px solid ${dayIdx>=0?'var(--green)':'var(--amber)'};border-radius:8px;cursor:pointer;min-width:100px;">
+      <span style="font-size:0.65rem;font-weight:700;color:${dayIdx>=0?'var(--green)':'var(--amber)'};">${dayLabel}${oraLabel}</span>
+      <span style="font-size:0.73rem;font-weight:600;color:var(--ink);">${nome}</span>
+      <span style="font-size:0.62rem;color:var(--ink3);">${f.loc}</span>
+    </div>`;
+  }).join('');
+}
+
 function changeWeek(dir) {
   routeWeekOffset = Math.max(0, routeWeekOffset + dir);
   const label = document.getElementById('week-label');
@@ -2062,6 +2125,90 @@ function changeWeek(dir) {
 }
 
 // Converte qualsiasi data in YYYY-MM-DD senza problemi di timezone
+// ══════════════════════════════════════════════
+// SISTEMA ZONE E TEMPI
+// ══════════════════════════════════════════════
+
+// Zone per giorno della settimana (1=Lun...6=Sab)
+const ZONE_DOW = {1:'MB', 2:'LC', 3:'SO', 4:'MB', 5:'LC', 6:'SO'};
+// Coppie di zone compatibili nello stesso giorno (con pausa pranzo)
+const ZONE_COMPAT = {'MB+LC':true,'LC+MB':true,'LC+SO':true,'SO+LC':true};
+// Velocità media (km/h) per calcolo tempi
+const ROAD_SPEED_KMH = 50;
+const ROAD_FACTOR = 1.4;
+const MAX_TRAVEL_MIN = 40;
+const DEFAULT_VISIT_MIN = 50;
+const DAY_START = 9*60+15; // 09:15
+const LUNCH_START = 12*60+30; // 12:30
+const LUNCH_END = 15*60+30; // 15:30
+
+// Calcola minuti di percorrenza tra due località
+function travelMinutes(loc1, loc2) {
+  const c1 = COORDS[loc1], c2 = COORDS[loc2];
+  if (!c1 || !c2) return 20;
+  const km = dist(c1, c2) * 111 * ROAD_FACTOR;
+  return Math.round(km / ROAD_SPEED_KMH * 60);
+}
+
+// Calcola orari stimati per una giornata di visite
+function calcOrari(day, startLoc) {
+  let t = DAY_START;
+  const orari = [];
+  let prevLoc = startLoc || startPoint.label || '';
+  day.forEach((f, i) => {
+    if (i > 0) t += travelMinutes(prevLoc, f.loc);
+    // Pausa pranzo
+    if (t > LUNCH_START && t < LUNCH_END) t = LUNCH_END;
+    orari.push(t);
+    t += getVisitDuration(f.id);
+    prevLoc = f.loc;
+  });
+  return orari;
+}
+
+// Formatta minuti in HH:MM
+function minToHHMM(min) {
+  const h = Math.floor(min/60);
+  const m = min % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+// ── APPRENDIMENTO ADATTIVO ──
+function loadTiming() {
+  try { return JSON.parse(localStorage.getItem('farmarete_timing') || '{}'); } catch(e) { return {}; }
+}
+function saveTiming(t) {
+  try { localStorage.setItem('farmarete_timing', JSON.stringify(t)); } catch(e) {}
+}
+function getVisitDuration(farmaciaId) {
+  const t = loadTiming();
+  const id = String(farmaciaId);
+  if (t[id] && t[id].length >= 2) {
+    return Math.round(t[id].reduce((a,b)=>a+b,0)/t[id].length);
+  }
+  const f = FARMACIE.find(x => String(x.id) === id);
+  if (f && t['prov_'+f.p] && t['prov_'+f.p].length >= 3) {
+    return Math.round(t['prov_'+f.p].reduce((a,b)=>a+b,0)/t['prov_'+f.p].length);
+  }
+  return DEFAULT_VISIT_MIN;
+}
+function recordVisitDuration(farmaciaId, durationMin) {
+  if (durationMin < 10 || durationMin > 180) return;
+  const t = loadTiming();
+  const id = String(farmaciaId);
+  if (!t[id]) t[id] = [];
+  t[id].push(Math.round(durationMin));
+  if (t[id].length > 10) t[id].shift();
+  const f = FARMACIE.find(x => String(x.id) === id);
+  if (f) {
+    const pk = 'prov_'+f.p;
+    if (!t[pk]) t[pk] = [];
+    t[pk].push(Math.round(durationMin));
+    if (t[pk].length > 50) t[pk].shift();
+  }
+  saveTiming(t);
+}
+
 function toYMD(val) {
   if (!val) return '';
   if (typeof val === 'string' && val.length === 10 && val[4] === '-') return val;
@@ -2078,54 +2225,43 @@ function buildRoute() {
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
   const todayYMD = toYMD(new Date());
 
-  // Calcola date della settimana corrente (con offset)
-  function getWeekDates(weekOffset) {
+  // Date della settimana
+  function getWeekDates(offset) {
     const dates = [];
     const start = new Date();
-    start.setDate(start.getDate() + weekOffset * 7);
-    if (weekOffset > 0) {
+    start.setDate(start.getDate() + offset * 7);
+    if (offset > 0) {
       const dow = start.getDay();
       if (dow !== 1) start.setDate(start.getDate() + (dow === 0 ? 1 : 8 - dow));
     }
     const tmp = new Date(start);
     while (dates.length < numDays) {
-      if (tmp.getDay() !== 0) dates.push(new Date(tmp));
+      if (tmp.getDay() !== 0 && tmp.getDay() !== 6) dates.push(new Date(tmp));
       tmp.setDate(tmp.getDate() + 1);
     }
     return dates;
   }
 
-  // Date della settimana visualizzata
   routeDates = getWeekDates(routeWeekOffset);
   const weekStrs = routeDates.map(d => toYMD(d));
 
-  // DEBUG: mostra appuntamenti trovati questa settimana
-  const debugAppts = FARMACIE.filter(f => {
+  // Priorità farmacia (1=massima)
+  function priority(f) {
     const fd = getFD(f.id);
-    return fd.dataAppuntamento && weekStrs.includes(toYMD(fd.dataAppuntamento));
-  });
-  let debugEl = document.getElementById('debug-appts');
-  if (!debugEl) {
-    debugEl = document.createElement('div');
-    debugEl.id = 'debug-appts';
-    debugEl.style = 'background:#fff3cd;padding:8px 12px;border-radius:8px;font-size:0.75rem;margin:4px 0;';
-    const container = document.getElementById('route-list-label');
-    if (container && container.parentNode) container.parentNode.insertBefore(debugEl, container);
+    if (fd.stato === 'richiamare') return 1;
+    if (fd.isTop && isScaduta(f.id)) return 2;
+    if (isScaduta(f.id)) return 3;
+    if (fd.isTop) return 4;
+    return 5;
   }
-  debugEl.textContent = debugAppts.length > 0
-    ? '📅 Appuntamenti questa settimana: ' + debugAppts.map(f => (getFD(f.id).nomeCustom || f.nome) + ' → ' + toYMD(getFD(f.id).dataAppuntamento)).join(' | ')
-    : '📅 Nessun appuntamento trovato questa settimana (weekStrs: ' + weekStrs.join(', ') + ')';
 
-  // Pool base: farmacie senza appuntamento futuro, filtrate per provincia
+  // Pool base: senza appuntamenti futuri, senza visitati/assenti recenti
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = getFD(f.id);
-    // Escludi se ha appuntamento futuro (verrà aggiunto come pinned)
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-    // Escludi se visitata non scaduta
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
-    // Escludi assente per 3 giorni
     if (fd.stato === 'assente' && fd.dataVisita) {
       const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
       if (gg < 3) return false;
@@ -2133,97 +2269,135 @@ function buildRoute() {
     return true;
   });
 
-  // Costruisce i giorni per le settimane precedenti (solo per usedIds)
-  const preUsed = new Set();
-  for (let w = 0; w < routeWeekOffset; w++) {
-    const wDates = getWeekDates(w);
-    const wStrs = wDates.map(d => toYMD(d));
-    for (let d = 0; d < numDays; d++) {
-      // pinned di settimane passate
+  // Costruisce il percorso settimanale con logica zone
+  function buildWeekZone(poolSorted) {
+    const days = [];
+    const usedIds = new Set();
+
+    // Pre-calcola settimane precedenti per usedIds
+    for (let w = 0; w < routeWeekOffset; w++) {
+      const wDates = getWeekDates(w);
+      const wStrs = wDates.map(d => toYMD(d));
+      // Segna appuntamenti settimane passate come usati
       FARMACIE.forEach(f => {
         const fd = getFD(f.id);
-        if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === wStrs[d]) preUsed.add(String(f.id));
+        if (fd.dataAppuntamento && wStrs.includes(toYMD(fd.dataAppuntamento))) {
+          usedIds.add(String(f.id));
+        }
       });
-      // filled di settimane passate
-      pool.filter(f => !preUsed.has(String(f.id))).slice(0, perDay).forEach(f => preUsed.add(String(f.id)));
+      // Segna farmacie assegnate nelle settimane precedenti
+      let wUsed = new Set(usedIds);
+      for (let d = 0; d < numDays; d++) {
+        const dow = wDates[d].getDay();
+        const zone = ZONE_DOW[dow] || 'MB';
+        poolSorted.filter(f => f.p === zone && !wUsed.has(String(f.id)))
+          .slice(0, perDay).forEach(f => {
+            wUsed.add(String(f.id));
+            usedIds.add(String(f.id));
+          });
+      }
     }
-  }
 
-  // Calcola centroide di un gruppo di farmacie
-  function centroide(farmacie) {
-    const coords = farmacie.map(f => COORDS[f.loc]).filter(Boolean);
-    if (!coords.length) return { lat: startPoint.lat, lng: startPoint.lng };
-    return {
-      lat: coords.reduce((s,c) => s+c.lat, 0) / coords.length,
-      lng: coords.reduce((s,c) => s+c.lng, 0) / coords.length
-    };
-  }
+    for (let d = 0; d < numDays; d++) {
+      const dayStr = weekStrs[d];
+      const dow = routeDates[d].getDay();
+      const primaryZone = ZONE_DOW[dow] || 'MB';
 
-  // Costruisce i giorni della settimana corrente
-  function buildWeek(poolList, preUsedIds) {
-    const days = [];
-    const usedIds = new Set(preUsedIds);
-
-    // STEP 1: raccogli tutti gli appuntamenti della settimana per giorno
-    const pinnedPerDay = weekStrs.map(dayStr =>
-      FARMACIE.filter(f => {
+      // STEP 1: appuntamenti del giorno (qualsiasi provincia)
+      const pinned = FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
         if (escluseIds.has(String(f.id))) return false;
         const fd = getFD(f.id);
         return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
-      })
-    );
-    pinnedPerDay.forEach(pinned => pinned.forEach(f => usedIds.add(String(f.id))));
-
-    // STEP 2: distribuisci le farmacie rimanenti in cluster geografici per giorno
-    const remaining = poolList.filter(f => !usedIds.has(String(f.id)));
-
-    // Calcola centroide per ogni giorno (basato su appuntamenti o distribuzione uniforme)
-    const dayCentroids = pinnedPerDay.map((pinned, i) => {
-      if (pinned.length > 0) return centroide(pinned);
-      // Senza appuntamenti: distribuisci uniformemente per area geografica
-      const sorted = [...remaining].sort((a,b) => {
-        const ca = COORDS[a.loc] || {lat:0,lng:0};
-        const cb = COORDS[b.loc] || {lat:0,lng:0};
-        return (ca.lat + ca.lng) - (cb.lat + cb.lng);
+      }).sort((a,b) => {
+        // Ordina per orario appuntamento se disponibile
+        const ta = getFD(a.id).oraAppuntamento || '23:59';
+        const tb = getFD(b.id).oraAppuntamento || '23:59';
+        return ta.localeCompare(tb);
       });
-      const chunk = Math.floor(sorted.length / numDays);
-      const slice = sorted.slice(i * chunk, (i+1) * chunk);
-      return centroide(slice.length ? slice : remaining);
-    });
+      pinned.forEach(f => usedIds.add(String(f.id)));
 
-    // STEP 3: assegna ogni farmacia al giorno con centroide più vicino
-    const dayPools = Array.from({length: numDays}, () => []);
-    const tmpUsed = new Set(usedIds);
-    remaining.forEach(f => {
-      const c = COORDS[f.loc] || dayCentroids[0];
-      let bestDay = 0, bestDist = Infinity;
-      dayCentroids.forEach((dc, i) => {
-        const d = dist(c, dc);
-        if (d < bestDist) { bestDist = d; bestDay = i; }
+      // STEP 2: determina zone attive del giorno
+      // Primary zone + eventuale secondary se compatibile
+      const activeZones = new Set([primaryZone]);
+      pinned.forEach(f => {
+        if (f.p !== primaryZone) {
+          const key = primaryZone + '+' + f.p;
+          const keyRev = f.p + '+' + primaryZone;
+          if (ZONE_COMPAT[key] || ZONE_COMPAT[keyRev]) {
+            activeZones.add(f.p);
+          }
+          // MB+SO mai insieme
+          if ((primaryZone === 'MB' && f.p === 'SO') || (primaryZone === 'SO' && f.p === 'MB')) {
+            activeZones.delete(f.p); // rimuovi la zona incompatibile
+          }
+        }
       });
-      dayPools[bestDay].push(f);
-    });
 
-    // STEP 4: costruisci ogni giorno con pinned + pool del giorno (limite perDay)
-    for (let d = 0; d < numDays; d++) {
-      const pinned = pinnedPerDay[d];
+      // STEP 3: riempi con priorità e vincolo 40 min
       const slots = Math.max(0, perDay - pinned.length);
-      const dayFree = dayPools[d].slice(0, slots);
-      dayFree.forEach(f => usedIds.add(String(f.id)));
+      const dayRoute = [...pinned];
+      let currentLoc = pinned.length > 0
+        ? pinned[pinned.length-1].loc
+        : startPoint.label;
 
-      const centro = pinned.length > 0 ? centroide(pinned) : centroide(dayFree);
-      days.push(nearestNeighborFrom([...pinned, ...dayFree], centro));
+      // Pool del giorno filtrato per zone e non usato
+      const dayPool = poolSorted.filter(f =>
+        !usedIds.has(String(f.id)) && activeZones.has(f.p)
+      );
+
+      // Aggiungi farmacie rispettando max 40 min e priorità
+      const remaining = [...dayPool];
+      while (dayRoute.length < perDay && remaining.length > 0) {
+        let chosen = null;
+        let chosenIdx = -1;
+
+        // Prima cerca tra priorità 1-3 entro 40 min
+        for (let pri = 1; pri <= 5; pri++) {
+          const candidates = remaining
+            .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
+            .filter(x => priority(x.f) === pri && x.t <= MAX_TRAVEL_MIN);
+          if (candidates.length > 0) {
+            candidates.sort((a, b) => a.t - b.t);
+            chosen = candidates[0].f;
+            chosenIdx = candidates[0].i;
+            break;
+          }
+        }
+        // Se non trova entro 40 min, prendi il più vicino per priorità
+        if (!chosen) {
+          const byPri = remaining
+            .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
+            .sort((a, b) => priority(a.f) - priority(b.f) || a.t - b.t);
+          if (byPri.length > 0) {
+            chosen = byPri[0].f;
+            chosenIdx = byPri[0].i;
+          }
+        }
+        if (!chosen) break;
+        remaining.splice(chosenIdx, 1);
+        dayRoute.push(chosen);
+        usedIds.add(String(chosen.id));
+        currentLoc = chosen.loc;
+      }
+
+      days.push(dayRoute);
     }
     return days;
   }
 
-  const percA = buildWeek([...pool], preUsed);
-  const topP = pool.filter(f => getFD(f.id).isTop);
-  const normP = pool.filter(f => !getFD(f.id).isTop);
-  const percB = buildWeek([...topP, ...normP], preUsed);
-  const scadPool = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
-  const percC = buildWeek(scadPool, preUsed);
+  // Tre varianti percorso
+  const poolBase = [...pool];
+  const poolTop = [...pool].sort((a,b) => {
+    const pa = (getFD(a.id).isTop?0:10) + (isScaduta(a.id)?0:5);
+    const pb = (getFD(b.id).isTop?0:10) + (isScaduta(b.id)?0:5);
+    return pa - pb;
+  });
+  const poolScad = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
+
+  const percA = buildWeekZone(poolBase);
+  const percB = buildWeekZone(poolTop);
+  const percC = buildWeekZone(poolScad);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
@@ -2234,14 +2408,20 @@ function buildRoute() {
   document.getElementById('percorsi-alt').style.display = 'flex';
   document.querySelectorAll('.pa-tab').forEach((t,i) => t.classList.toggle('active', i===0));
 
+  // Rimuovi debug banner se presente
+  const dbg = document.getElementById('debug-appts');
+  if (dbg) dbg.remove();
+
   renderDayTabs();
   renderDayList(keepDay);
+  renderApptStrip();
   renderEscluse();
   updateBadges();
 
   document.getElementById('route-list-label').textContent =
-    `Percorso Ottimale · ${pool.length} farmacie`;
+    `Percorso per zone · ${pool.length} farmacie`;
 }
+
 
 function selectPercorso(idx) {
   currentPercorsoIdx = idx;
@@ -2294,12 +2474,20 @@ function renderDayList(dayIdx) {
     return;
   }
   const data = loadData();
+  const orari = calcOrari(day, startPoint.label);
+
   day.forEach((f, i) => {
     const fd = data[String(f.id)] || {};
     const stato = fd.stato || '';
     const isTop = fd.isTop || false;
     const scad = isScaduta(f.id);
     const gg = giorniDaUltima(f.id);
+    const oraStimata = minToHHMM(orari[i]);
+    const oraAppt = fd.oraAppuntamento ? `<span style="font-size:0.7rem;font-weight:700;color:var(--green);">🕐 ${fd.oraAppuntamento}</span>` : '';
+    const travelNext = i < day.length-1 ? travelMinutes(f.loc, day[i+1].loc) : 0;
+    const travelTag = travelNext > MAX_TRAVEL_MIN
+      ? `<span style="font-size:0.62rem;color:var(--red);">⚠️ ${travelNext}min</span>`
+      : travelNext > 0 ? `<span style="font-size:0.62rem;color:var(--ink3);">→${travelNext}min</span>` : '';
 
     const item = document.createElement('div');
     let cls = 'route-item fade-in';
@@ -2313,15 +2501,18 @@ function renderDayList(dayIdx) {
     const numColor = stato==='visitata'?'var(--green)':stato==='assente'?'var(--red)':stato==='richiamare'?'var(--amber)':'var(--ink2)';
     const numLabel = stato==='visitata'?'✓':stato==='assente'?'✕':stato==='richiamare'?'↩':String(i+1);
     const apptLabel = getLabelAppuntamento(f.id);
-    const metaHtml = apptLabel 
+    const metaHtml = apptLabel
       ? `<span style="font-size:0.66rem;color:var(--green);font-weight:700;">${apptLabel}</span>`
       : gg < Infinity ? `<span style="font-size:0.66rem;color:${scad?'var(--red)':'var(--ink3)'};">${scad?'⏰ ':''} ${gg}g fa</span>` : '';
 
     item.innerHTML = `
       <div class="route-num" style="background:${numColor};">${numLabel}</div>
       <div class="route-info" onclick="openModal(${f.id})">
-        <div class="route-name">${isTop?'⭐ ':''}${getFD(f.id).nomeCustom||f.n}</div>
-        <div class="route-addr">${f.a} · ${f.loc} ${metaHtml}</div>
+        <div class="route-name" style="display:flex;align-items:center;gap:6px;">
+          <span>${isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${getFD(f.id).nomeCustom||f.n}</span>
+          <span style="font-size:0.7rem;color:var(--ink3);font-weight:400;margin-left:auto;">${oraAppt || oraStimata}</span>
+        </div>
+        <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
         <div class="card-esiti">
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴</button>
@@ -2344,16 +2535,33 @@ function quickEsito(e, id, esito) {
   const fd = getFD(id);
   if (fd.stato === esito) {
     setFD(id, {stato:'', dataVisita:null, dataAppuntamento:null});
+    localStorage.removeItem('farmarete_last_visit');
   } else {
-    // Se visitata oggi, azzera anche l'appuntamento (è stato evaso)
-    const update = {stato:esito, dataVisita:new Date().toISOString().slice(0,10)};
-    if (esito === 'visitata') update.dataAppuntamento = null;
+    const update = {stato:esito, dataVisita:toYMD(new Date())};
+    if (esito === 'visitata') {
+      update.dataAppuntamento = null;
+      // Apprendimento adattivo: calcola durata visita precedente
+      try {
+        const last = JSON.parse(localStorage.getItem('farmarete_last_visit') || 'null');
+        const now = Date.now();
+        if (last && last.time && last.id) {
+          const elapsedMin = (now - last.time) / 60000;
+          const lastF = FARMACIE.find(x => String(x.id) === String(last.id));
+          const currF = FARMACIE.find(x => String(x.id) === id);
+          if (lastF && currF && elapsedMin > 5 && elapsedMin < 180) {
+            const travel = travelMinutes(lastF.loc, currF.loc);
+            const visitDur = elapsedMin - travel;
+            if (visitDur > 5) recordVisitDuration(last.id, visitDur);
+          }
+        }
+        localStorage.setItem('farmarete_last_visit', JSON.stringify({id, time: now}));
+      } catch(e) {}
+    }
     setFD(id, update);
   }
   renderDayList(selectedDay);
   updateBadges();
   autoUploadAfterSave();
-  // Mostra banner "Rigenera percorso" se ci sono visitate/assenti oggi
   if (esito === 'visitata' || esito === 'assente') showRigeneraBanner('✅ Esito registrato');
 }
 
@@ -2415,9 +2623,13 @@ function ripristinaFarmacia(id) {
 function renderEscluse() {
   const panel = document.getElementById('escluse-panel');
   const list = document.getElementById('escluse-list');
+  const arrow = document.getElementById('escluse-arrow');
   document.getElementById('escluse-count').textContent = escluseIds.size;
   if (escluseIds.size === 0) { panel.style.display='none'; return; }
   panel.style.display = 'block';
+  // Mantieni stato aperto/chiuso attuale, di default chiuso
+  const isOpen = list.style.display === 'flex';
+  if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
   list.innerHTML = '';
   escluseIds.forEach(id => {
     const f = escluseData[id] || FARMACIE.find(x=>x.id===id);
@@ -2648,7 +2860,7 @@ function renderFarmacie() {
     if (fd.isTop) item.style.borderLeft = '3px solid var(--amber)';
     item.innerHTML = `
       <div class="farmacia-info">
-        <div class="farmacia-name">${fd.isTop?'⭐ ':''}${emoji} ${fd.nomeCustom||f.n}</div>
+        <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
         <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
         ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
       </div>
@@ -2698,10 +2910,12 @@ function openModal(id) {
   // Data visita / appuntamento
   const dataInput = document.getElementById('modal-data-visita');
   const hint = document.getElementById('modal-data-hint');
+  const oraEl = document.getElementById('modal-ora-appuntamento');
+  if (oraEl) oraEl.value = fd.oraAppuntamento || '';
   const dataVal = fd.dataAppuntamento || fd.dataVisita;
   if (dataVal) {
     const d = new Date(dataVal);
-    dataInput.value = d.toISOString().split('T')[0];
+    dataInput.value = toYMD(d);
     const oggi = new Date();
     oggi.setHours(0,0,0,0);
     if (d > oggi) {
@@ -2735,6 +2949,21 @@ function openModal(id) {
   };
   const starBtn = document.getElementById('modal-star');
   starBtn.dataset.isTop = fd.isTop ? 'true' : 'false';
+  // Cliente/Prospect
+  const cliEl = document.getElementById('modal-cliente-btn');
+  const prosEl = document.getElementById('modal-prospect-btn');
+  if (cliEl) {
+    cliEl.dataset.active = fd.isCliente ? 'true' : 'false';
+    cliEl.style.background = fd.isCliente ? '#e8f5e9' : 'var(--card)';
+    cliEl.style.borderColor = fd.isCliente ? 'var(--green)' : 'var(--border)';
+    cliEl.style.color = fd.isCliente ? 'var(--green)' : '';
+  }
+  if (prosEl) {
+    prosEl.dataset.active = fd.isProspect ? 'true' : 'false';
+    prosEl.style.background = fd.isProspect ? '#e3f2fd' : 'var(--card)';
+    prosEl.style.borderColor = fd.isProspect ? '#2196f3' : 'var(--border)';
+    prosEl.style.color = fd.isProspect ? '#2196f3' : '';
+  }
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
 
   document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato === fd.stato));
@@ -2751,6 +2980,38 @@ function closeModal() { document.getElementById('modal-overlay').classList.remov
 function closeModalIfOutside(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
 function setStato(stato) { document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato===stato)); }
 function setPrio(prio) { document.querySelectorAll('.prio-chip').forEach(c => c.classList.toggle('active', c.dataset.prio===prio)); }
+function toggleClienteModal() {
+  const btn = document.getElementById('modal-cliente-btn');
+  const prosBtn = document.getElementById('modal-prospect-btn');
+  const isActive = btn.dataset.active === 'true';
+  btn.dataset.active = isActive ? 'false' : 'true';
+  btn.style.background = isActive ? 'var(--card)' : '#e8f5e9';
+  btn.style.borderColor = isActive ? 'var(--border)' : 'var(--green)';
+  btn.style.color = isActive ? '' : 'var(--green)';
+  // Prospect e Cliente si escludono
+  if (!isActive) {
+    prosBtn.dataset.active = 'false';
+    prosBtn.style.background = 'var(--card)';
+    prosBtn.style.borderColor = 'var(--border)';
+    prosBtn.style.color = '';
+  }
+}
+function toggleProspectModal() {
+  const btn = document.getElementById('modal-prospect-btn');
+  const cliBtn = document.getElementById('modal-cliente-btn');
+  const isActive = btn.dataset.active === 'true';
+  btn.dataset.active = isActive ? 'false' : 'true';
+  btn.style.background = isActive ? 'var(--card)' : '#e3f2fd';
+  btn.style.borderColor = isActive ? 'var(--border)' : '#2196f3';
+  btn.style.color = isActive ? '' : '#2196f3';
+  if (!isActive) {
+    cliBtn.dataset.active = 'false';
+    cliBtn.style.background = 'var(--card)';
+    cliBtn.style.borderColor = 'var(--border)';
+    cliBtn.style.color = '';
+  }
+}
+
 function toggleTopModal() {
   const btn = document.getElementById('modal-star');
   const isCurrentlyTop = btn.dataset.isTop === 'true';
@@ -2763,21 +3024,28 @@ function saveModal() {
   const prioEl = document.querySelector('.prio-chip.active'); const priorita = prioEl ? prioEl.dataset.prio : '';
   const note = document.getElementById('modal-notes').value.trim();
   const isTop = document.getElementById('modal-star').dataset.isTop === 'true';
+  const cliBtn = document.getElementById('modal-cliente-btn');
+  const prosBtn = document.getElementById('modal-prospect-btn');
+  const isCliente = cliBtn?.dataset.active === 'true';
+  const isProspect = prosBtn?.dataset.active === 'true';
   const freq = parseInt(document.getElementById('modal-freq').value) || 90;
   const nomeCustom = document.getElementById('modal-nome').value.trim();
   const dataVisitaInput = document.getElementById('modal-data-visita').value;
-  const update = { stato, priorita, note, isTop, frequenza:freq };
+  const update = { stato, priorita, note, isTop, frequenza:freq, isCliente, isProspect };
   // Nome personalizzato
   if (nomeCustom) update.nomeCustom = nomeCustom;
   // Data visita o appuntamento
   if (dataVisitaInput) {
-    const oggi = toYMD(new Date()); // YYYY-MM-DD in ora locale
-    if (dataVisitaInput >= oggi) { // >= include anche oggi
-      update.dataAppuntamento = dataVisitaInput; // salva come YYYY-MM-DD puro
+    const oggi = toYMD(new Date());
+    const oraInput = document.getElementById('modal-ora-appuntamento')?.value || '';
+    if (dataVisitaInput >= oggi) {
+      update.dataAppuntamento = dataVisitaInput;
+      update.oraAppuntamento = oraInput || null;
       update.dataVisita = null;
     } else {
       update.dataVisita = dataVisitaInput;
       update.dataAppuntamento = null;
+      update.oraAppuntamento = null;
     }
   } else if (stato && stato !== 'da-visitare') {
     update.dataVisita = new Date().toISOString().slice(0,10);
