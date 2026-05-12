@@ -2501,11 +2501,11 @@ function renderDayList(dayIdx) {
           <span style="font-size:0.7rem;color:var(--ink3);font-weight:400;margin-left:auto;">${oraAppt || oraStimata}</span>
         </div>
         <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
-        <div class="card-esiti">
-          <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅</button>
-          <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴</button>
-          <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁</button>
-          <button class="btn-esito escludi" onclick="escludiFarmacia(event,${f.id})">🚫</button>
+        <div class="card-esiti" style="flex-wrap:wrap;gap:5px;">
+          <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
+          <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
+          <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
+          <button class="btn-esito escludi" onclick="escludiFarmacia(event,${f.id})">🚫 Escludi</button>
         </div>
       </div>
       <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
