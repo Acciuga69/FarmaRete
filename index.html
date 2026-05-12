@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -1086,7 +1085,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
           <option value="MB">MB</option>
           <option value="LC">LC</option>
           <option value="SO">SO</option>
-          <option value="DR MAX">DR MAX</option>
+          
           <option value="LAFARMACIA">LaFarmacia</option>
         </select>
         <span class="ctrl-label">Far./g</span>
@@ -1136,7 +1135,10 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <div class="route-list-wrap">
         <div class="route-list-header">
           <span id="route-list-label">Genera un percorso</span>
-          <span id="route-list-count"></span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span id="route-list-count"></span>
+            <button id="btn-ricalcola-day" onclick="ricalcolaGiorno(selectedDay)" style="display:none;font-size:0.72rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-weight:600;">🔄 Ricalcola</button>
+          </span>
         </div>
         <div class="route-list scroll" id="route-list">
           <div class="empty-state"><div class="icon">🗺️</div><h4>Nessun percorso</h4><p>Configura i parametri e premi "Genera percorsi".</p></div>
@@ -1685,16 +1687,6 @@ const FARMACIE_RAW = [
   {n:"CARBONE SAS",a:"VIA DANTE ALIGHIERI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"DOTT. BIGLIOLI SRL",a:"LARGO ALBERTO PEDRINI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"FARMAGORA' SONDRIO SRL",a:"PIAZZETTA PIETRO RUSCONI, 5",c:"23100",loc:"SONDRIO",p:"SO"},
-  // DR MAX
-  {n:"DR MAX ARCORE",a:"VIA CASATI 36",c:"20862",loc:"ARCORE",p:"DR MAX"},
-  {n:"DR MAX BERNAREGGIO",a:"VIA SAN BARTOLOMEO 1",c:"20881",loc:"BERNAREGGIO",p:"DR MAX"},
-  {n:"DR MAX MONZA CORSO MILANO",a:"CORSO MILANO, 31",c:"20900",loc:"MONZA",p:"DR MAX"},
-  {n:"DR MAX MONZA RONDO'",a:"VIA LARIO, 17",c:"20900",loc:"MONZA",p:"DR MAX"},
-  {n:"DR MAX VIMERCATE",a:"PIAZZALE GUGLIELMO MARCONI 7/D",c:"20871",loc:"VIMERCATE",p:"DR MAX"},
-  {n:"DR MAX CARATE BRIANZA",a:"PIAZZA IV NOVEMBRE 3",c:"20841",loc:"CARATE BRIANZA",p:"DR MAX"},
-  {n:"DR MAX SEREGNO",a:"PIAZZA CONCORDIA 6",c:"20831",loc:"SEREGNO",p:"DR MAX"},
-  {n:"DR MAX LECCO",a:"LUNGOLARIO ISONZO 18",c:"23900",loc:"LECCO",p:"DR MAX"},
-  {n:"DR MAX ORENO",a:"VIA TRIESTE 63",c:"20876",loc:"ORENO",p:"DR MAX"},
   // LAFARMACIA
   {n:"LAFARMACIA BOVISIO-MASCIAGO",a:"PIAZZA ANSELMO IV DA BOVISIO, 7",c:"20813",loc:"BOVISIO-MASCIAGO",p:"LAFARMACIA"},
   {n:"LAFARMACIA MEDA",a:"VIA TICINO 18",c:"20821",loc:"MEDA",p:"LAFARMACIA"},
@@ -1992,6 +1984,8 @@ function useGPS() {
       if (input) input.value = '📍 Posizione attuale';
       if (btn) { btn.textContent = '✅'; btn.disabled = false; }
       buildRoute();
+      // Aggiorna anche Maps con la nuova posizione GPS
+      if (currentRoute.length) aggiornaMapsDopoVisita(selectedDay);
     },
     (err) => {
       if (btn) { btn.textContent = '🎯 GPS'; btn.disabled = false; }
@@ -2451,6 +2445,8 @@ function renderDayList(dayIdx) {
   list.innerHTML = '';
   const day = currentRoute[dayIdx] || [];
   document.getElementById('route-list-count').textContent = day.length ? `${day.length} fermate` : '';
+  const btnRic = document.getElementById('btn-ricalcola-day');
+  if (btnRic) btnRic.style.display = day.length ? 'inline-block' : 'none';
   if (!day.length) {
     list.innerHTML = '<div class="empty-state"><div class="icon">📋</div><h4>Nessuna farmacia</h4></div>';
     return;
@@ -2512,15 +2508,12 @@ function renderDayList(dayIdx) {
           <button class="btn-esito escludi" onclick="escludiFarmacia(event,${f.id})">🚫</button>
         </div>
       </div>
-      <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':f.p==='DR MAX'?'badge-drmax':'badge-lf'}">${f.p}</div>
+      <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
     `;
     list.appendChild(item);
   });
 
-  document.getElementById('map-toolbar-info').innerHTML = `
-    📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate
-    &nbsp;<button onclick="ricalcolaGiorno(${dayIdx})" style="font-size:0.72rem;padding:2px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;">🔄 Ricalcola</button>
-  `;
+  document.getElementById('map-toolbar-info').innerHTML = `📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate`;
   showMapsPanel(dayIdx);
 }
 
@@ -2557,7 +2550,10 @@ function quickEsito(e, id, esito) {
   renderDayList(selectedDay);
   updateBadges();
   autoUploadAfterSave();
-  if (esito === 'visitata' || esito === 'assente') showRigeneraBanner('✅ Esito registrato');
+  // Aggiorna Maps automaticamente: salta le farmacie già visitate
+  if (esito === 'visitata' || esito === 'assente') {
+    aggiornaMapsDopoVisita(selectedDay);
+  }
 }
 
 function showRigeneraBanner(msg) {
@@ -2606,14 +2602,13 @@ function escludiFarmacia(e, id) {
   escluseIds.add(String(id));
   if (f) escluseData[id] = f;
   saveEscluse();
-  buildRoute();
-  showRigeneraBanner('🚫 Farmacia esclusa');
+  showRigeneraBanner('🚫 Esclusa — premi 🔄 per aggiornare il percorso');
 }
 function ripristinaFarmacia(id) {
   escluseIds.delete(String(id));
   delete escluseData[id];
   saveEscluse();
-  buildRoute();
+  showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
 function ricalcolaGiorno(dayIdx) {
   // Ricalcola solo il giorno selezionato mantenendo gli altri invariati
@@ -2760,6 +2755,50 @@ function showMapsPanel(dayIdx) {
       <span style="color:var(--green);font-size:0.8rem;">▶</span>
     </div>
   `).join('');
+}
+
+function aggiornaMapsDopoVisita(dayIdx) {
+  const day = currentRoute[dayIdx] || [];
+  if (!day.length) return;
+  const data = loadData();
+  // Filtra solo le farmacie NON ancora visitate e NON assenti oggi
+  const todayYMD = toYMD(new Date());
+  const rimanenti = day.filter(f => {
+    const fd = data[String(f.id)] || {};
+    if (fd.stato === 'visitata' && fd.dataVisita === todayYMD) return false;
+    if (fd.stato === 'assente' && fd.dataVisita === todayYMD) return false;
+    return true;
+  });
+  if (!rimanenti.length) {
+    // Tutte visitate!
+    const panel = document.getElementById('maps-panel');
+    const empty = document.getElementById('map-empty');
+    if (empty) { empty.style.display='flex'; empty.innerHTML='<div style="text-align:center;padding:20px;"><div style="font-size:2rem;">🎉</div><h4>Giorno completato!</h4><p>Tutte le farmacie visitate.</p></div>'; }
+    if (panel) panel.style.display='none';
+    return;
+  }
+  // Usa GPS se disponibile, altrimenti startPoint
+  const origin = startPoint.lat
+    ? startPoint.lat + ',' + startPoint.lng
+    : (startPoint.label + ', Italia');
+  buildMapsUrlsFromList(rimanenti, origin);
+  // Mostra toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:calc(var(--nav-h,60px) + 60px);left:50%;transform:translateX(-50%);background:#1e8a5e;color:#fff;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:600;z-index:9999;';
+  toast.textContent = `✅ Maps aggiornato — ${rimanenti.length} fermate rimanenti`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function buildMapsUrlsFromList(stops, origin) {
+  if (!stops.length) return;
+  const encOrigin = encodeURIComponent(origin);
+  const dest = encodeURIComponent(`${stops[stops.length-1].a}, ${stops[stops.length-1].loc}, Italia`);
+  const wps = stops.slice(0,-1).slice(0,8).map(f => encodeURIComponent(`${f.a}, ${f.loc}, Italia`)).join('|');
+  window._gUrl = `https://www.google.com/maps/dir/?api=1&origin=${encOrigin}&destination=${dest}&travelmode=driving${wps?'&waypoints='+wps:''}`;
+  const c = COORDS[(stops[0]||{}).loc] || {lat:45.69, lng:9.24};
+  window._aUrl = `maps://?saddr=${encOrigin}&daddr=${encodeURIComponent(stops[0].a+', '+stops[0].loc+', Italia')}&dirflg=d`;
+  window._wUrl = `https://waze.com/ul?ll=${c.lat},${c.lng}&navigate=yes`;
 }
 
 function buildMapsUrls(day) {
@@ -2945,17 +2984,42 @@ function renderFarmacie() {
     item.style.background = bg;
     if (scad && !stato) item.style.borderLeft = '3px solid var(--red)';
     if (fd.isTop) item.style.borderLeft = '3px solid var(--amber)';
+    const isEsclusa = escluseIds.has(String(f.id));
     item.innerHTML = `
-      <div class="farmacia-info">
+      <div class="farmacia-info" onclick="openModal(${f.id})" style="flex:1;cursor:pointer;">
         <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
         <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
         ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
       </div>
-      <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':f.p==='DR MAX'?'badge-drmax':'badge-lf'}">${f.p}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+        <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
+        <button onclick="event.stopPropagation();escludiFarmaciaToggle(${f.id},this)" style="font-size:0.65rem;padding:2px 6px;border-radius:6px;border:1px solid ${isEsclusa?'var(--red)':'var(--border)'};background:${isEsclusa?'var(--red-light)':'var(--card)'};cursor:pointer;color:${isEsclusa?'var(--red)':'var(--ink3)'};">${isEsclusa?'🔓 Includi':'🚫 Escludi'}</button>
+      </div>
     `;
-    item.onclick = () => openModal(f.id);
     list.appendChild(item);
   });
+}
+
+function escludiFarmaciaToggle(id, btn) {
+  loadEscluse();
+  const key = String(id);
+  if (escluseIds.has(key)) {
+    escluseIds.delete(key);
+    delete escluseData[key];
+    btn.textContent = '🚫 Escludi';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'var(--card)';
+    btn.style.color = 'var(--ink3)';
+  } else {
+    escluseIds.add(key);
+    escluseData[key] = { data: new Date().toISOString().slice(0,10) };
+    btn.textContent = '🔓 Includi';
+    btn.style.borderColor = 'var(--red)';
+    btn.style.background = 'var(--red-light)';
+    btn.style.color = 'var(--red)';
+  }
+  saveEscluse();
+  showRigeneraBanner('🔄 Premi Genera percorsi per aggiornare');
 }
 
 function onGlobalSearch(val) {
@@ -3145,7 +3209,7 @@ function saveModal() {
   updateBadges();
   // Se è cambiato qualcosa che influenza il routing, rigenera il percorso
   if (update.dataAppuntamento !== undefined || update.stato || update.frequenza || update.isTop !== undefined) {
-    buildRoute();
+    showRigeneraBanner('💾 Salvato — premi 🔄 per aggiornare il percorso');
   }
   // Aggiorna anche la pagina corrente
   const activePage = document.querySelector('.page.active');
@@ -3559,4 +3623,3 @@ window.addEventListener('load', () => {
   }
 });
 </script></body></html>
-
