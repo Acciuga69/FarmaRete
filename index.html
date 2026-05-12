@@ -442,7 +442,6 @@ input[type=number] { width: 62px; }
 .tag-LC { background: var(--amber-light); color: var(--amber); }
 .tag-SO { background: var(--red-light); color: var(--red); }
 .tag-DRMAX { background: var(--purple-light); color: var(--purple); }
-.tag-LAFARMACIA { background: #fce7f3; color: #be185d; }
 .tag-visitata { background: var(--green-light); color: var(--green); }
 .tag-richiamare { background: var(--amber-light); color: var(--amber); }
 .tag-caldo { background: var(--red-light); color: var(--red); }
@@ -1086,7 +1085,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
           <option value="LC">LC</option>
           <option value="SO">SO</option>
           
-          <option value="LAFARMACIA">LaFarmacia</option>
+          
         </select>
         <span class="ctrl-label">Far./g</span>
         <input type="number" id="per-day" value="7" min="3" max="15">
@@ -1256,6 +1255,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
           <button id="modal-prospect-btn" onclick="toggleProspectModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🔍 Prospect</button>
+          <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🚫 Escludi</button>
         </div>
       </div>
       <div>
@@ -1687,14 +1687,6 @@ const FARMACIE_RAW = [
   {n:"CARBONE SAS",a:"VIA DANTE ALIGHIERI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"DOTT. BIGLIOLI SRL",a:"LARGO ALBERTO PEDRINI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"FARMAGORA' SONDRIO SRL",a:"PIAZZETTA PIETRO RUSCONI, 5",c:"23100",loc:"SONDRIO",p:"SO"},
-  // LAFARMACIA
-  {n:"LAFARMACIA BOVISIO-MASCIAGO",a:"PIAZZA ANSELMO IV DA BOVISIO, 7",c:"20813",loc:"BOVISIO-MASCIAGO",p:"LAFARMACIA"},
-  {n:"LAFARMACIA MEDA",a:"VIA TICINO 18",c:"20821",loc:"MEDA",p:"LAFARMACIA"},
-  {n:"LAFARMACIA RENATE",a:"VIA ROMA 16",c:"20838",loc:"RENATE",p:"LAFARMACIA"},
-  {n:"LAFARMACIA VILLASANTA",a:"VIA M. BUONARROTI, 32",c:"20852",loc:"VILLASANTA",p:"LAFARMACIA"},
-  {n:"LAFARMACIA MONZA MOTTA",a:"VIA FELICE CAVALLOTTI 137",c:"20900",loc:"MONZA",p:"LAFARMACIA"},
-  {n:"LAFARMACIA MONTICELLO B.",a:"VIA VIRGINIA BESOZZI 1",c:"23876",loc:"MONTICELLO BRIANZA",p:"LAFARMACIA"},
-  {n:"LAFARMACIA CAMPODOLCINO",a:"VIA DON ROMEO BALLERINI 8",c:"23021",loc:"CAMPODOLCINO",p:"LAFARMACIA"},
 ];
 
 // Genera ID univoci
@@ -2508,7 +2500,7 @@ function renderDayList(dayIdx) {
           <button class="btn-esito escludi" onclick="escludiFarmacia(event,${f.id})">🚫 Escludi</button>
         </div>
       </div>
-      <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
+      <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-mb'}">${f.p}</div>
     `;
     list.appendChild(item);
   });
@@ -2991,10 +2983,7 @@ function renderFarmacie() {
         <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
         ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
-        <button onclick="event.stopPropagation();escludiFarmaciaToggle(${f.id},this)" style="font-size:0.65rem;padding:2px 6px;border-radius:6px;border:1px solid ${isEsclusa?'var(--red)':'var(--border)'};background:${isEsclusa?'var(--red-light)':'var(--card)'};cursor:pointer;color:${isEsclusa?'var(--red)':'var(--ink3)'};">${isEsclusa?'🔓 Includi':'🚫 Escludi'}</button>
-      </div>
+      <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-mb'}">${f.p}</div>
     `;
     list.appendChild(item);
   });
@@ -3115,6 +3104,16 @@ function openModal(id) {
     prosEl.style.borderColor = fd.isProspect ? '#2196f3' : 'var(--border)';
     prosEl.style.color = fd.isProspect ? '#2196f3' : '';
   }
+  const escludiEl = document.getElementById('modal-escludi-btn');
+  if (escludiEl) {
+    loadEscluse();
+    const isEsc = escluseIds.has(String(id));
+    escludiEl.dataset.active = isEsc ? 'true' : 'false';
+    escludiEl.style.background = isEsc ? 'var(--red-light)' : 'var(--card)';
+    escludiEl.style.borderColor = isEsc ? 'var(--red)' : 'var(--border)';
+    escludiEl.style.color = isEsc ? 'var(--red)' : '';
+    escludiEl.textContent = isEsc ? '🔓 Includi' : '🚫 Escludi';
+  }
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
 
   document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato === fd.stato));
@@ -3163,6 +3162,16 @@ function toggleProspectModal() {
   }
 }
 
+function toggleEscludiModal() {
+  const btn = document.getElementById('modal-escludi-btn');
+  const isActive = btn.dataset.active === 'true';
+  btn.dataset.active = isActive ? 'false' : 'true';
+  btn.style.background = isActive ? 'var(--card)' : 'var(--red-light)';
+  btn.style.borderColor = isActive ? 'var(--border)' : 'var(--red)';
+  btn.style.color = isActive ? '' : 'var(--red)';
+  btn.textContent = isActive ? '🚫 Escludi' : '🔓 Includi';
+}
+
 function toggleTopModal() {
   const btn = document.getElementById('modal-star');
   const isCurrentlyTop = btn.dataset.isTop === 'true';
@@ -3177,8 +3186,10 @@ function saveModal() {
   const isTop = document.getElementById('modal-star').dataset.isTop === 'true';
   const cliBtn = document.getElementById('modal-cliente-btn');
   const prosBtn = document.getElementById('modal-prospect-btn');
+  const escludiBtn = document.getElementById('modal-escludi-btn');
   const isCliente = cliBtn?.dataset.active === 'true';
   const isProspect = prosBtn?.dataset.active === 'true';
+  const isEsclusaDalModal = escludiBtn?.dataset.active === 'true';
   const freq = parseInt(document.getElementById('modal-freq').value) || 90;
   const nomeCustom = document.getElementById('modal-nome').value.trim();
   const dataVisitaInput = document.getElementById('modal-data-visita').value;
@@ -3208,6 +3219,19 @@ function saveModal() {
   refreshDashboard();
   updateBadges();
   // Se è cambiato qualcosa che influenza il routing, rigenera il percorso
+  // Applica esclusione/ripristino dal modal
+  if (isEsclusaDalModal !== undefined) {
+    loadEscluse();
+    const key = String(currentFarmaciaId);
+    if (isEsclusaDalModal) {
+      escluseIds.add(key);
+      escluseData[key] = { data: new Date().toISOString().slice(0,10) };
+    } else {
+      escluseIds.delete(key);
+      delete escluseData[key];
+    }
+    saveEscluse();
+  }
   if (update.dataAppuntamento !== undefined || update.stato || update.frequenza || update.isTop !== undefined) {
     showRigeneraBanner('💾 Salvato — premi 🔄 per aggiornare il percorso');
   }
