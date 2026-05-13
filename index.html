@@ -2646,16 +2646,38 @@ function ricalcolaGiorno(dayIdx) {
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
-
-  // Raccogli ID usati dagli altri giorni (non dayIdx)
-  const usedByOthers = new Set();
-  currentRoute.forEach((day, i) => {
-    if (i !== dayIdx) day.forEach(f => usedByOthers.add(String(f.id)));
-  });
-
-  // Pool disponibile per quel giorno
   const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
+
+  // Raccogli ID usati dagli altri giorni E dal giorno corrente (non-appuntamenti)
+  // così Ricalcola propone sempre farmacie DIVERSE
+  const usedByOthers = new Set();
+  currentRoute.forEach((day, i) => {
+    if (i !== dayIdx) {
+      day.forEach(f => usedByOthers.add(String(f.id)));
+    } else {
+      // Escludi le farmacie del giorno corrente (tranne gli appuntamenti fissi)
+      const todayAppts = new Set(
+        day.filter(f => {
+          const fd = loadData()[String(f.id)] || {};
+          return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
+        }).map(f => String(f.id))
+      );
+      day.forEach(f => {
+        if (!todayAppts.has(String(f.id))) usedByOthers.add(String(f.id));
+      });
+    }
+  });
+  // Se non ci sono abbastanza farmacie alternative, libera il vincolo
+  const poolAlternativo = FARMACIE.filter(f => {
+    if (usedByOthers.has(String(f.id))) return false;
+    const fd = (loadData())[String(f.id)] || {};
+    return fd.stato !== 'richiamare' && !escluseIds.has(String(f.id));
+  });
+  if (poolAlternativo.length < Math.ceil(perDay / 2)) {
+    // Non ci sono abbastanza alternative: rimuovi il vincolo del giorno corrente
+    currentRoute[dayIdx].forEach(f => usedByOthers.delete(String(f.id)));
+  }
 
   // Appuntamenti del giorno (fissi)
   const pinned = FARMACIE.filter(f => {
