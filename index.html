@@ -1922,12 +1922,25 @@ function calcolaFrequenzaAdattiva() {
   return Math.min(giorniGiro, 90);
 }
 
+function frequenzaDefault(fd) {
+  // Default per tipo: Top=30gg, Cliente=45gg, Potenziale=90gg
+  if (fd.isTop) return 30;
+  if (fd.isCliente || fd.stato === 'da-visitare') return 45;
+  if (fd.isProspect || fd.stato === 'potenziale') return 90;
+  return 45; // default generico
+}
+
 function frequenza(id) {
   const fd = getFD(String(id));
-  if (fd.frequenza && fd.frequenza !== 90) return fd.frequenza; // frequenza custom
-  if (fd.isTop) return 45;
-  // Frequenza adattiva basata sul numero di farmacie
-  return calcolaFrequenzaAdattiva();
+  if (fd.frequenza) return fd.frequenza; // frequenza custom manuale sovrascrive tutto
+  return frequenzaDefault(fd);
+}
+
+function urgenza(id) {
+  // Ratio giorni trascorsi / frequenza: >= 1 = scaduto, 0.8 = quasi scaduto
+  const gg = giorniDaUltima(id);
+  const freq = frequenza(id);
+  return gg / freq;
 }
 function isScaduta(id) {
   if (isAppuntamentoFuturo(id)) return false; // ha già un appuntamento
@@ -2260,21 +2273,50 @@ function buildRoute() {
   routeDates = getWeekDates(routeWeekOffset);
   const weekStrs = routeDates.map(d => toYMD(d));
 
-  // Priorità farmacia (1=massima)
-  function priority(f) {
+  // Score urgenza: più alto = più urgente da visitare
+  function urgenzaScore(f) {
+    const u = urgenza(f.id);          // ratio giorni/frequenza
     const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return 1;           // da richiamare
-    if (fd.isTop && isScaduta(f.id)) return 2;        // top + scaduto
-    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3; // scaduti e potenziali miscelati
-    if (fd.isTop) return 4;                           // top non scaduto
-    return 5;                                         // normali
+    let score = u * 100;              // base: % scadenza
+    if (fd.isTop) score *= 1.5;       // top clienti: boost 50%
+    if (fd.isCliente) score *= 1.2;   // clienti normali: boost 20%
+    return score;
   }
+
+  // Priorità per variante Ottimale (1=massima urgenza)
+  function priorityOttimale(f) {
+    const u = urgenza(f.id);
+    const fd = _getFD(f.id);
+    if (u >= 1 && fd.isTop) return 1;       // top scaduto
+    if (u >= 1) return 2;                   // scaduto
+    if (u >= 0.8 && fd.isTop) return 3;     // top quasi scaduto
+    if (u >= 0.8) return 4;                 // quasi scaduto
+    if (fd.isTop) return 5;                 // top non ancora scaduto
+    if (fd.isProspect || fd.stato === 'potenziale') return 6; // potenziale
+    return 7;                               // normale non scaduto
+  }
+
+  // Priorità per variante Priorità (top prima di tutto)
+  function priorityTop(f) {
+    const u = urgenza(f.id);
+    const fd = _getFD(f.id);
+    if (fd.isTop && u >= 1) return 1;
+    if (fd.isTop) return 2;
+    if (u >= 1) return 3;
+    if (u >= 0.8) return 4;
+    if (fd.isProspect || fd.stato === 'potenziale') return 5;
+    return 6;
+  }
+
+  // Priorità per variante Geografico (solo distanza, ignora priorità)
+  function priorityGeo() { return 1; } // tutti stessa priorità
 
   // Pool base: senza appuntamenti futuri, senza visitati/assenti recenti
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = _getFD(f.id);
+    if (fd.stato === 'richiamare') return false; // solo nella sezione Richiami
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     if (fd.stato === 'assente' && fd.dataVisita) {
@@ -2284,16 +2326,16 @@ function buildRoute() {
     return true;
   });
 
-  // Costruisce il percorso: niente zone, solo GPS + priorità + distanza
-  // Tu escludi quello che non vuoi → l'app ottimizza quello che rimane
-  function buildDays(poolSorted) {
+  // Costruisce il percorso con la funzione priorità passata
+  function buildDays(poolSorted, priFunc) {
+    const MAX_PRI = priFunc === priorityGeo ? 1 : 7;
     const days = [];
     const usedIds = new Set();
 
     for (let d = 0; d < numDays; d++) {
       const dayStr = weekStrs[d];
 
-      // STEP 1: appuntamenti del giorno — sempre presenti, ignorano le esclusioni
+      // STEP 1: appuntamenti del giorno — sempre presenti
       const pinned = FARMACIE.filter(f => {
         if (usedIds.has(String(f.id))) return false;
         const fd = _getFD(f.id);
@@ -2305,40 +2347,30 @@ function buildRoute() {
       });
       pinned.forEach(f => usedIds.add(String(f.id)));
 
-      // STEP 2: parte dal punto GPS (ogni giorno riparte da casa/ufficio)
       const dayRoute = [...pinned];
       let currentLoc = pinned.length > 0
         ? pinned[pinned.length - 1].loc
         : startPoint.label;
 
-      // STEP 3: riempi con nearest-neighbor per priorità, senza filtri di zona
       const remaining = poolSorted.filter(f => !usedIds.has(String(f.id)));
 
       while (dayRoute.length < perDay && remaining.length > 0) {
-        let chosen = null;
-        let chosenIdx = -1;
+        let chosen = null, chosenIdx = -1;
 
-        // Cerca per priorità crescente entro MAX_TRAVEL_MIN
-        for (let pri = 1; pri <= 5; pri++) {
+        for (let pri = 1; pri <= MAX_PRI; pri++) {
           const candidates = remaining
             .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
-            .filter(x => priority(x.f) === pri && x.t <= MAX_TRAVEL_MIN);
+            .filter(x => priFunc(x.f) === pri && x.t <= MAX_TRAVEL_MIN);
           if (candidates.length > 0) {
             candidates.sort((a, b) => a.t - b.t);
-            chosen = candidates[0].f;
-            chosenIdx = candidates[0].i;
-            break;
+            chosen = candidates[0].f; chosenIdx = candidates[0].i; break;
           }
         }
-        // Fallback: il più vicino per priorità senza limite distanza
         if (!chosen) {
           const byPri = remaining
             .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
-            .sort((a, b) => priority(a.f) - priority(b.f) || a.t - b.t);
-          if (byPri.length > 0) {
-            chosen = byPri[0].f;
-            chosenIdx = byPri[0].i;
-          }
+            .sort((a, b) => priFunc(a.f) - priFunc(b.f) || a.t - b.t);
+          if (byPri.length > 0) { chosen = byPri[0].f; chosenIdx = byPri[0].i; }
         }
         if (!chosen) break;
         remaining.splice(chosenIdx, 1);
@@ -2352,18 +2384,19 @@ function buildRoute() {
     return days;
   }
 
-  // Tre varianti percorso
-  const poolBase = [...pool];
-  const poolTop = [...pool].sort((a,b) => {
-    const pa = (_getFD(a.id).isTop?0:10) + (isScaduta(a.id)?0:5) + (_getFD(a.id).stato==='potenziale'?0:3);
-    const pb = (_getFD(b.id).isTop?0:10) + (isScaduta(b.id)?0:5) + (_getFD(b.id).stato==='potenziale'?0:3);
-    return pa - pb;
-  });
-  const poolScad = [...pool].sort((a,b) => giorniDaUltima(b.id) - giorniDaUltima(a.id));
+  // Tre varianti con logica distinta
 
-  const percA = buildDays(poolBase);
-  const percB = buildDays(poolTop);
-  const percC = buildDays(poolScad);
+  // A — Ottimale: ordine per urgenza (scaduti+top prima), poi geografico
+  const poolOttimale = [...pool].sort((a,b) => urgenzaScore(b) - urgenzaScore(a));
+  const percA = buildDays(poolOttimale, priorityOttimale);
+
+  // B — Geografico: puro nearest-neighbor, ignora priorità
+  const poolGeo = [...pool]; // ordine originale, la distanza fa tutto
+  const percB = buildDays(poolGeo, priorityGeo);
+
+  // C — Priorità: top clienti prima di tutto, poi scaduti, poi resto
+  const poolPrio = [...pool].sort((a,b) => priorityTop(a) - priorityTop(b));
+  const percC = buildDays(poolPrio, priorityTop);
 
   allPercorsi = [percA, percB, percC];
   currentPercorsoIdx = 0;
@@ -2385,7 +2418,7 @@ function buildRoute() {
   updateBadges();
 
   document.getElementById('route-list-label').textContent =
-    `Percorso per zone · ${pool.length} farmacie`;
+    `⚖️ Ottimale · ${pool.length} farmacie disponibili`;
 }
 
 
@@ -2394,7 +2427,7 @@ function selectPercorso(idx) {
   currentRoute = allPercorsi[idx];
   selectedDay = 0;
   document.querySelectorAll('.pa-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
-  const labels = ['Ottimale','Priorità Top','Scadenze'];
+  const labels = ['⚖️ Ottimale','📍 Geografico','⭐ Priorità'];
   const pool = FARMACIE.filter(f => {
     const prov = document.getElementById('prov-filter').value;
     return (prov==='ALL' || f.p===prov) && !escluseIds.has(String(f.id));
@@ -2603,7 +2636,11 @@ function ripristinaFarmacia(id) {
   showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
 function ricalcolaGiorno(dayIdx) {
-  // Ricalcola solo il giorno selezionato mantenendo gli altri invariati
+  // Cicla tra le 3 varianti: Ottimale → Geografico → Priorità → Ottimale
+  window._ricalcolaVariante = ((window._ricalcolaVariante || 0) + 1) % 3;
+  const varIdx = window._ricalcolaVariante;
+  const varNames = ['📍 Geografico','⭐ Priorità','⚖️ Ottimale'];
+
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
@@ -2657,15 +2694,26 @@ function ricalcolaGiorno(dayIdx) {
   let currentLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
   const remaining = [...pool];
 
-  // Mischia leggermente per dare un'alternativa (Fisher-Yates)
-  for (let i = remaining.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  // Ordina in base alla variante ciclica
+  if (varIdx === 0) {
+    // Geografico: nessun sort, solo distanza
+  } else if (varIdx === 1) {
+    // Priorità: top prima
+    remaining.sort((a,b) => pri(a)-pri(b));
+  } else {
+    // Ottimale: urgenza
+    remaining.sort((a,b) => {
+      const ua = giorniDaUltima(a.id) / frequenza(a.id);
+      const ub = giorniDaUltima(b.id) / frequenza(b.id);
+      const boost = (f) => _getFD(f.id).isTop ? 1.5 : _getFD(f.id).isCliente ? 1.2 : 1;
+      return (ub * boost(b)) - (ua * boost(a));
+    });
   }
 
+  const MAX_PRI_R = varIdx === 0 ? 1 : 7;
   while (newDay.length < perDay && remaining.length > 0) {
     let chosen = null, chosenIdx = -1;
-    for (let p = 1; p <= 5; p++) {
+    for (let p = 1; p <= MAX_PRI_R; p++) {
       const cands = remaining
         .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
         .filter(x => pri(x.f)===p && x.t<=MAX_TRAVEL_MIN);
@@ -2677,7 +2725,7 @@ function ricalcolaGiorno(dayIdx) {
     if (!chosen) {
       const byPri = remaining
         .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
-        .sort((a,b) => pri(a.f)-pri(b.f) || a.t-b.t);
+        .sort((a,b) => (varIdx===0 ? a.t-b.t : pri(a.f)-pri(b.f) || a.t-b.t));
       if (byPri.length) { chosen=byPri[0].f; chosenIdx=byPri[0].i; }
     }
     if (!chosen) break;
@@ -2692,6 +2740,13 @@ function ricalcolaGiorno(dayIdx) {
   currentRoute[dayIdx] = newDay;
   renderDayTabs();
   renderDayList(dayIdx);
+
+  // Toast con nome variante
+  const toast = document.createElement("div");
+  toast.style.cssText = "position:fixed;bottom:calc(var(--nav-h,60px) + 60px);left:50%;transform:translateX(-50%);background:#1565c0;color:#fff;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:600;z-index:9999;";
+  toast.textContent = varNames[varIdx] + " — " + newDay.length + " fermate";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
 }
 
 function renderEscluse() {
