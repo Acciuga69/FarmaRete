@@ -2640,6 +2640,8 @@ function ricalcolaGiorno(dayIdx) {
   window._ricalcolaVariante = ((window._ricalcolaVariante || 0) + 1) % 3;
   const varIdx = window._ricalcolaVariante;
   const varNames = ['📍 Geografico','⭐ Priorità','⚖️ Ottimale'];
+  // Seed random per dare sempre risultati diversi anche nella stessa variante
+  const seed = Date.now();
 
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
@@ -2669,6 +2671,7 @@ function ricalcolaGiorno(dayIdx) {
     if (pinnedIds.has(String(f.id))) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = _getFD(f.id);
+    if (fd.stato === 'richiamare') return false; // solo sezione Richiami
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
     if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
     if (fd.stato === 'assente' && fd.dataVisita) {
@@ -2678,14 +2681,13 @@ function ricalcolaGiorno(dayIdx) {
     return true;
   });
 
-  // Funzione priorità locale
+  // Funzione priorità locale (richiamare già esclusi dal pool)
   const pri = (f) => {
     const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return 1;
-    if (fd.isTop && isScaduta(f.id)) return 2;
-    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3;
-    if (fd.isTop) return 4;
-    return 5;
+    if (fd.isTop && isScaduta(f.id)) return 1;
+    if (isScaduta(f.id) || fd.stato === 'potenziale') return 2;
+    if (fd.isTop) return 3;
+    return 4;
   };
 
   // Costruisci nuovo giorno con nearest-neighbor
@@ -2694,9 +2696,15 @@ function ricalcolaGiorno(dayIdx) {
   let currentLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
   const remaining = [...pool];
 
-  // Ordina in base alla variante ciclica
+  // Shuffle leggero per dare risultati sempre diversi (Fisher-Yates con seed temporale)
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor((seed * (i + 1)) % (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+
+  // Poi ordina in base alla variante ciclica
   if (varIdx === 0) {
-    // Geografico: nessun sort, solo distanza
+    // Geografico: solo distanza, shuffle già fatto per varietà
   } else if (varIdx === 1) {
     // Priorità: top prima
     remaining.sort((a,b) => pri(a)-pri(b));
