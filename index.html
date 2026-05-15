@@ -1216,6 +1216,17 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 </div>
 
 <!-- ══ MODAL FARMACIA ══ -->
+<!-- Pannello alternative ricalcola -->
+<div class="modal-overlay" id="ricalcola-overlay" onclick="chiudiRicalcolaPanel(event)" style="z-index:1100;">
+  <div class="modal" id="ricalcola-panel" style="max-height:85vh;overflow-y:auto;padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;font-size:1rem;">🔄 Scegli un percorso alternativo</h3>
+      <button onclick="document.getElementById('ricalcola-overlay').classList.remove('open')" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">✕</button>
+    </div>
+    <div id="ricalcola-alternatives"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalIfOutside(event)">
   <div class="modal" id="modal">
     <div class="modal-handle"></div>
@@ -2582,7 +2593,6 @@ function quickEsito(e, id, esito) {
 }
 
 function showRigeneraBanner(msg) {
-  // Remove existing banner if present
   dismissRigenera();
   const banner = document.createElement('div');
   banner.id = 'rigenera-banner';
@@ -2593,22 +2603,24 @@ function showRigeneraBanner(msg) {
     'transform:translateX(-50%)',
     'background:#1a1a2e',
     'color:#fff',
-    'padding:10px 16px',
+    'padding:8px 12px',
     'border-radius:12px',
-    'font-size:0.78rem',
+    'font-size:0.75rem',
     'font-weight:500',
     'box-shadow:0 4px 20px rgba(0,0,0,0.3)',
     'z-index:9999',
     'display:flex',
     'align-items:center',
-    'gap:10px',
-    'white-space:nowrap',
-    'max-width:calc(100vw - 32px)',
+    'gap:8px',
+    'max-width:calc(100vw - 24px)',
+    'flex-wrap:nowrap',
   ].join(';');
-  const label = msg || '✅ Farmacia aggiornata';
-  banner.innerHTML = label +
-    ' <button onclick="buildRoute();dismissRigenera()" style="background:#1e8a5e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:0.76rem;min-height:36px;">🔄 Ricalcola</button>' +
-    ' <button onclick="dismissRigenera()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:1rem;padding:4px;">✕</button>';
+  // Testo breve + pulsanti compatti
+  const shortMsg = (msg || '✅ Aggiornato').replace(' — premi 🔄 per aggiornare il percorso','').replace(' per aggiornare','');
+  banner.innerHTML =
+    `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortMsg}</span>` +
+    `<button onclick="buildRoute();dismissRigenera()" style="background:#1e8a5e;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;font-size:0.73rem;white-space:nowrap;flex-shrink:0;">🔄 Genera</button>` +
+    `<button onclick="dismissRigenera()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:1rem;padding:2px 4px;flex-shrink:0;">✕</button>`;
   document.body.appendChild(banner);
   setTimeout(dismissRigenera, 7000);
 }
@@ -2636,74 +2648,52 @@ function ripristinaFarmacia(id) {
   showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
 function ricalcolaGiorno(dayIdx) {
-  // Cicla tra le 3 varianti: Ottimale → Geografico → Priorità → Ottimale
-  window._ricalcolaVariante = ((window._ricalcolaVariante || 0) + 1) % 3;
-  const varIdx = window._ricalcolaVariante;
-  const varNames = ['📍 Geografico','⭐ Priorità','⚖️ Ottimale'];
-  // Seed random per dare sempre risultati diversi anche nella stessa variante
-  const seed = Date.now();
-
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
   const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
 
-  // Raccogli ID usati dagli altri giorni E dal giorno corrente (non-appuntamenti)
-  // così Ricalcola propone sempre farmacie DIVERSE
-  const usedByOthers = new Set();
-  currentRoute.forEach((day, i) => {
-    if (i !== dayIdx) {
-      day.forEach(f => usedByOthers.add(String(f.id)));
-    } else {
-      // Escludi le farmacie del giorno corrente (tranne gli appuntamenti fissi)
-      const todayAppts = new Set(
-        day.filter(f => {
-          const fd = loadData()[String(f.id)] || {};
-          return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
-        }).map(f => String(f.id))
-      );
-      day.forEach(f => {
-        if (!todayAppts.has(String(f.id))) usedByOthers.add(String(f.id));
-      });
-    }
-  });
-  // Se non ci sono abbastanza farmacie alternative, libera il vincolo
-  const poolAlternativo = FARMACIE.filter(f => {
-    if (usedByOthers.has(String(f.id))) return false;
-    const fd = (loadData())[String(f.id)] || {};
-    return fd.stato !== 'richiamare' && !escluseIds.has(String(f.id));
-  });
-  if (poolAlternativo.length < Math.ceil(perDay / 2)) {
-    // Non ci sono abbastanza alternative: rimuovi il vincolo del giorno corrente
-    currentRoute[dayIdx].forEach(f => usedByOthers.delete(String(f.id)));
-  }
-
-  // Appuntamenti del giorno (fissi)
+  // Appuntamenti fissi del giorno
   const pinned = FARMACIE.filter(f => {
     const fd = _getFD(f.id);
     return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
   }).sort((a,b) => (_getFD(a.id).oraAppuntamento||'23:59').localeCompare(_getFD(b.id).oraAppuntamento||'23:59'));
-
   const pinnedIds = new Set(pinned.map(f => String(f.id)));
 
-  // Pool libero
-  const pool = FARMACIE.filter(f => {
-    if (usedByOthers.has(String(f.id))) return false;
-    if (pinnedIds.has(String(f.id))) return false;
-    if (escluseIds.has(String(f.id))) return false;
-    const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return false; // solo sezione Richiami
-    if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-    if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
-    if (fd.stato === 'assente' && fd.dataVisita) {
-      const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
-      if (gg < 3) return false;
-    }
-    return true;
+  // Usati dagli altri giorni
+  const usedByOthers = new Set();
+  currentRoute.forEach((day, i) => {
+    if (i !== dayIdx) day.forEach(f => usedByOthers.add(String(f.id)));
   });
 
-  // Funzione priorità locale (richiamare già esclusi dal pool)
+  // Pool disponibile (escluso giorno corrente per avere alternative vere)
+  const currentDayIds = new Set((currentRoute[dayIdx]||[])
+    .filter(f => !pinnedIds.has(String(f.id)))
+    .map(f => String(f.id)));
+
+  function buildPool(excludeCurrentDay) {
+    return FARMACIE.filter(f => {
+      if (usedByOthers.has(String(f.id))) return false;
+      if (pinnedIds.has(String(f.id))) return false;
+      if (escluseIds.has(String(f.id))) return false;
+      if (excludeCurrentDay && currentDayIds.has(String(f.id))) return false;
+      const fd = _getFD(f.id);
+      if (fd.stato === 'richiamare') return false;
+      if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
+      if (fd.stato === 'visitata' && fd.dataVisita && !isScaduta(f.id)) return false;
+      if (fd.stato === 'assente' && fd.dataVisita) {
+        const gg = Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+        if (gg < 3) return false;
+      }
+      return true;
+    });
+  }
+
+  // Prova prima con pool alternativo, se insufficiente usa pool completo
+  let pool = buildPool(true);
+  if (pool.length < Math.ceil(perDay / 2)) pool = buildPool(false);
+
   const pri = (f) => {
     const fd = _getFD(f.id);
     if (fd.isTop && isScaduta(f.id)) return 1;
@@ -2712,71 +2702,95 @@ function ricalcolaGiorno(dayIdx) {
     return 4;
   };
 
-  // Costruisci nuovo giorno con nearest-neighbor
-  const newDay = [...pinned];
-  const usedDay = new Set(pinned.map(f => String(f.id)));
-  let currentLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
-  const remaining = [...pool];
-
-  // Shuffle leggero per dare risultati sempre diversi (Fisher-Yates con seed temporale)
-  for (let i = remaining.length - 1; i > 0; i--) {
-    const j = Math.floor((seed * (i + 1)) % (i + 1));
-    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-  }
-
-  // Poi ordina in base alla variante ciclica
-  if (varIdx === 0) {
-    // Geografico: solo distanza, shuffle già fatto per varietà
-  } else if (varIdx === 1) {
-    // Priorità: top prima
-    remaining.sort((a,b) => pri(a)-pri(b));
-  } else {
-    // Ottimale: urgenza
-    remaining.sort((a,b) => {
+  // Funzione che costruisce un giorno da un pool con strategia
+  function buildGiorno(poolInput, strategy, seedOffset) {
+    const result = [...pinned];
+    let loc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
+    const rem = [...poolInput];
+    // Shuffle con seed diverso per ogni alternativa
+    const s = Date.now() + seedOffset;
+    for (let i = rem.length - 1; i > 0; i--) {
+      const j = Math.floor((s * (i + 1)) % (i + 1));
+      [rem[i], rem[j]] = [rem[j], rem[i]];
+    }
+    if (strategy === 'priorita') rem.sort((a,b) => pri(a)-pri(b));
+    if (strategy === 'ottimale') rem.sort((a,b) => {
       const ua = giorniDaUltima(a.id) / frequenza(a.id);
       const ub = giorniDaUltima(b.id) / frequenza(b.id);
-      const boost = (f) => _getFD(f.id).isTop ? 1.5 : _getFD(f.id).isCliente ? 1.2 : 1;
-      return (ub * boost(b)) - (ua * boost(a));
+      const boost = f => _getFD(f.id).isTop ? 1.5 : _getFD(f.id).isCliente ? 1.2 : 1;
+      return (ub*boost(b)) - (ua*boost(a));
     });
-  }
-
-  const MAX_PRI_R = varIdx === 0 ? 1 : 7;
-  while (newDay.length < perDay && remaining.length > 0) {
-    let chosen = null, chosenIdx = -1;
-    for (let p = 1; p <= MAX_PRI_R; p++) {
-      const cands = remaining
-        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
-        .filter(x => pri(x.f)===p && x.t<=MAX_TRAVEL_MIN);
-      if (cands.length > 0) {
-        cands.sort((a,b) => a.t-b.t);
-        chosen = cands[0].f; chosenIdx = cands[0].i; break;
+    const maxPri = strategy === 'geo' ? 1 : 4;
+    while (result.length < perDay && rem.length > 0) {
+      let chosen = null, idx = -1;
+      for (let p = 1; p <= maxPri; p++) {
+        const cands = rem.map((f,i) => ({f,i,t:travelMinutes(loc,f.loc)}))
+          .filter(x => pri(x.f)===p && x.t<=MAX_TRAVEL_MIN);
+        if (cands.length > 0) {
+          cands.sort((a,b) => a.t-b.t);
+          chosen=cands[0].f; idx=cands[0].i; break;
+        }
       }
+      if (!chosen) {
+        const fb = rem.map((f,i)=>({f,i,t:travelMinutes(loc,f.loc)}))
+          .sort((a,b) => strategy==='geo' ? a.t-b.t : pri(a.f)-pri(b.f)||a.t-b.t);
+        if (fb.length) { chosen=fb[0].f; idx=fb[0].i; }
+      }
+      if (!chosen) break;
+      rem.splice(idx,1);
+      result.push(chosen);
+      loc = chosen.loc;
     }
-    if (!chosen) {
-      const byPri = remaining
-        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
-        .sort((a,b) => (varIdx===0 ? a.t-b.t : pri(a.f)-pri(b.f) || a.t-b.t));
-      if (byPri.length) { chosen=byPri[0].f; chosenIdx=byPri[0].i; }
-    }
-    if (!chosen) break;
-    remaining.splice(chosenIdx,1);
-    newDay.push(chosen);
-    usedDay.add(String(chosen.id));
-    currentLoc = chosen.loc;
+    return result;
   }
 
-  // Aggiorna solo quel giorno in tutti i percorsi
-  allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = newDay; });
-  currentRoute[dayIdx] = newDay;
-  renderDayTabs();
-  renderDayList(dayIdx);
+  // Genera 3 alternative con strategie diverse
+  const alt1 = buildGiorno(pool, 'ottimale', 0);
+  const alt2 = buildGiorno(pool, 'geo', 1000);
+  const alt3 = buildGiorno(pool, 'priorita', 2000);
 
-  // Toast con nome variante
-  const toast = document.createElement("div");
-  toast.style.cssText = "position:fixed;bottom:calc(var(--nav-h,60px) + 60px);left:50%;transform:translateX(-50%);background:#1565c0;color:#fff;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:600;z-index:9999;";
-  toast.textContent = varNames[varIdx] + " — " + newDay.length + " fermate";
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+  const alternatives = [
+    { label: '⚖️ Ottimale', desc: 'Scadenze + top clienti + distanza', day: alt1, color: '#1e8a5e' },
+    { label: '📍 Geografico', desc: 'Il giro più corto', day: alt2, color: '#1565c0' },
+    { label: '⭐ Priorità', desc: 'Top clienti prima di tutto', day: alt3, color: '#e65100' }
+  ];
+
+  // Mostra pannello scelta
+  const container = document.getElementById('ricalcola-alternatives');
+  container.innerHTML = '';
+  alternatives.forEach((alt, altIdx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'border:2px solid '+alt.color+';border-radius:12px;padding:12px;margin-bottom:12px;cursor:pointer;';
+    const preview = alt.day.slice(0,4).map(f => {
+      const fd = _getFD(f.id);
+      return (fd.isTop?'⭐ ':'') + (fd.nomeCustom||f.n) + ' <span style="font-size:0.65rem;color:#888;">'+f.loc+'</span>';
+    }).join('<br>');
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="color:${alt.color};font-size:0.95rem;">${alt.label}</strong>
+        <span style="font-size:0.75rem;color:#888;">${alt.day.length} fermate</span>
+      </div>
+      <div style="font-size:0.72rem;color:#666;margin-bottom:8px;">${alt.desc}</div>
+      <div style="font-size:0.78rem;line-height:1.6;">${preview}${alt.day.length>4?'<br><span style="color:#888;font-size:0.7rem;">...e altri '+(alt.day.length-4)+'</span>':''}</div>
+      <button style="margin-top:10px;width:100%;padding:8px;background:${alt.color};color:#fff;border:none;border-radius:8px;font-weight:700;font-size:0.85rem;cursor:pointer;">✔ Usa questo percorso</button>
+    `;
+    card.querySelector('button').onclick = () => {
+      allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = alt.day; });
+      currentRoute[dayIdx] = alt.day;
+      document.getElementById('ricalcola-overlay').classList.remove('open');
+      renderDayTabs();
+      renderDayList(dayIdx);
+    };
+    container.appendChild(card);
+  });
+
+  document.getElementById('ricalcola-overlay').classList.add('open');
+}
+
+function chiudiRicalcolaPanel(e) {
+  if (e.target === document.getElementById('ricalcola-overlay')) {
+    document.getElementById('ricalcola-overlay').classList.remove('open');
+  }
 }
 
 function renderEscluse() {
