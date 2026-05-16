@@ -1265,7 +1265,6 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <span style="font-size:0.75rem;color:var(--ink3);">Visita ogni 45 giorni</span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
-          <button id="modal-caldo-btn" onclick="toggleCaldoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🔥 Caldo</button>
           <button id="modal-ordinato-btn" onclick="toggleOrdinatoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ha ordinato</button>
           <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🚫 Escludi</button>
         </div>
@@ -1938,7 +1937,9 @@ function frequenzaDefault(fd) {
   // Default per tipo: Top=30gg, Cliente=45gg, Potenziale=90gg
   if (fd.isTop) return 30;
   if (fd.isCliente || fd.stato === 'da-visitare') return 45;
-  if (fd.isCaldo) return 60;
+  if (fd.priorita === 'caldo') return 60;
+  if (fd.priorita === 'tiepido') return 90;
+  if (fd.priorita === 'freddo') return 120;
   if (fd.stato === 'potenziale') return 90;
   return 45; // default generico
 }
@@ -2309,7 +2310,7 @@ function buildRoute() {
     if (u >= 1 && fd.isCliente) return 2;       // cliente scaduto
     if (u >= 1) return 3;                        // scaduto generico
     if (u >= 0.8 && fd.isTop) return 4;         // top quasi scaduto
-    if (fd.isCaldo) return 5;                   // caldo (interesse attivo)
+    if (fd.priorita === 'caldo') return 5;                   // caldo (interesse attivo)
     if (fd.haOrdinato) return 6;                // ha ordinato → da risentire
     if (fd.isTop) return 7;                     // top non scaduto
     if (fd.stato === 'potenziale') return 8;    // potenziale
@@ -2324,7 +2325,7 @@ function buildRoute() {
     if (fd.isTop) return 2;
     if (fd.haOrdinato && u >= 0.8) return 3;
     if (u >= 1) return 4;
-    if (fd.isCaldo) return 5;
+    if (fd.priorita === 'caldo') return 5;
     if (fd.haOrdinato) return 6;
     if (u >= 0.8) return 7;
     return 8;
@@ -2534,9 +2535,9 @@ function renderDayList(dayIdx) {
     const clienteBadge = [
       isTop ? `<span style="font-size:0.65rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:6px;">⭐ TOP</span>` : '',
       fd.isCliente ? `<span style="font-size:0.65rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:6px;">🤝 CLI</span>` : '',
-      fd.isCaldo ? `<span style="font-size:0.65rem;font-weight:700;background:#e65100;color:#fff;padding:1px 5px;border-radius:6px;">🔥 Caldo</span>` : '',
+      fd.priorita==='caldo' ? `<span style="font-size:0.65rem;font-weight:700;background:#e65100;color:#fff;padding:1px 5px;border-radius:6px;">🔴 Caldo</span>` : fd.priorita==='tiepido' ? `<span style="font-size:0.65rem;font-weight:700;background:#f59e0b;color:#fff;padding:1px 5px;border-radius:6px;">🟡 Tiepido</span>` : '',
       fd.haOrdinato ? `<span style="font-size:0.65rem;font-weight:700;background:#2e7d32;color:#fff;padding:1px 5px;border-radius:6px;">📦 Ord.</span>` : '',
-      (!isTop && !fd.isCliente && !fd.isCaldo && (fd.isProspect || fd.stato==='potenziale')) ? `<span style="font-size:0.65rem;font-weight:700;background:#2196f3;color:#fff;padding:1px 5px;border-radius:6px;">🔍 POT</span>` : '',
+      (!isTop && !fd.isCliente && (fd.isProspect || fd.stato==='potenziale')) ? `<span style="font-size:0.65rem;font-weight:700;background:#2196f3;color:#fff;padding:1px 5px;border-radius:6px;">🔍 POT</span>` : '',
     ].filter(Boolean).join(' ');
 
     item.innerHTML = `
@@ -3143,7 +3144,7 @@ function renderFarmacie() {
     const isEsclusa = escluseIds.has(String(f.id));
     item.innerHTML = `
       <div class="farmacia-info" onclick="openModal(${f.id})" style="flex:1;cursor:pointer;">
-        <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isCaldo?'🔥 ':fd.isProspect?'🔍 ':''}${fd.haOrdinato?'📦 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
+        <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.priorita==='caldo'?'🔴 ':fd.priorita==='tiepido'?'🟡 ':fd.isProspect?'🔍 ':''}${fd.haOrdinato?'📦 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
         <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
         ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
       </div>
@@ -3262,13 +3263,6 @@ function openModal(id) {
     cliEl.style.borderColor = fd.isCliente ? 'var(--green)' : 'var(--border)';
     cliEl.style.color = fd.isCliente ? 'var(--green)' : '';
   }
-  const caldoEl = document.getElementById('modal-caldo-btn');
-  if (caldoEl) {
-    caldoEl.dataset.active = fd.isCaldo ? 'true' : 'false';
-    caldoEl.style.background = fd.isCaldo ? '#fff3e0' : 'var(--card)';
-    caldoEl.style.borderColor = fd.isCaldo ? '#e65100' : 'var(--border)';
-    caldoEl.style.color = fd.isCaldo ? '#e65100' : '';
-  }
   const ordinatoEl = document.getElementById('modal-ordinato-btn');
   if (ordinatoEl) {
     ordinatoEl.dataset.active = fd.haOrdinato ? 'true' : 'false';
@@ -3362,17 +3356,15 @@ function saveModal() {
   const note = document.getElementById('modal-notes').value.trim();
   const isTop = document.getElementById('modal-star').dataset.isTop === 'true';
   const cliBtn = document.getElementById('modal-cliente-btn');
-  const caldoBtn = document.getElementById('modal-caldo-btn');
   const ordinatoBtn = document.getElementById('modal-ordinato-btn');
   const escludiBtn = document.getElementById('modal-escludi-btn');
   const isCliente = cliBtn?.dataset.active === 'true';
-  const isCaldo = caldoBtn?.dataset.active === 'true';
   const haOrdinato = ordinatoBtn?.dataset.active === 'true';
   const isEsclusaDalModal = escludiBtn?.dataset.active === 'true';
   const freq = parseInt(document.getElementById('modal-freq').value) || 90;
   const nomeCustom = document.getElementById('modal-nome').value.trim();
   const dataVisitaInput = document.getElementById('modal-data-visita').value;
-  const update = { stato, priorita, note, isTop, frequenza:freq, isCliente, isCaldo, haOrdinato };
+  const update = { stato, priorita, note, isTop, frequenza:freq, isCliente, haOrdinato };
   // Nome personalizzato
   if (nomeCustom) update.nomeCustom = nomeCustom;
   // Data visita o appuntamento
