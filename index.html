@@ -1725,7 +1725,16 @@ if (navigator.storage && navigator.storage.persist) {
 }
 
 function loadData() {
-  try { return JSON.parse(localStorage.getItem('farmarete_v3') || '{}'); } catch(e) { return {}; }
+  try {
+    const d = JSON.parse(localStorage.getItem('farmarete_v3') || '{}');
+    // Normalizza dataVisita: se ISO string converti a YYYY-MM-DD
+    Object.values(d).forEach(fd => {
+      if (fd && fd.dataVisita && String(fd.dataVisita).length > 10) {
+        fd.dataVisita = String(fd.dataVisita).slice(0, 10);
+      }
+    });
+    return d;
+  } catch(e) { return {}; }
 }
 function saveData(d) {
   try { localStorage.setItem('farmarete_v3', JSON.stringify(d)); } catch(e) {}
@@ -1896,7 +1905,7 @@ function giorniDaUltima(id) {
     if (appt > oggi) return -1; // valore speciale: appuntamento futuro
   }
   if (!fd.dataVisita) return Infinity;
-  return Math.floor((Date.now() - new Date(fd.dataVisita).getTime()) / 86400000);
+  return Math.floor((Date.now() - new Date(String(fd.dataVisita).slice(0,10) + "T12:00:00").getTime()) / 86400000);
 }
 
 function isAppuntamentoFuturo(id) {
@@ -2342,7 +2351,8 @@ function buildRoute() {
     if (fd.stato === 'richiamare') return false; // solo nella sezione Richiami
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
     if (fd.dataVisita) {
-      const gg = Math.floor((Date.now() - new Date(fd.dataVisita + 'T12:00:00').getTime()) / 86400000);
+      const dvStr = String(fd.dataVisita).slice(0, 10);
+      const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
       const freq = fd.frequenza || frequenzaDefault(fd);
       if (fd.stato === 'visitata' && gg < freq) return false;
       if (fd.stato === 'assente' && gg < 3) return false;
@@ -2697,7 +2707,8 @@ function ricalcolaGiorno(dayIdx) {
       if (fd.stato === 'richiamare') return false;
       if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
       if (fd.dataVisita) {
-        const gg = Math.floor((Date.now() - new Date(fd.dataVisita + 'T12:00:00').getTime()) / 86400000);
+        const dvStr = String(fd.dataVisita).slice(0, 10);
+        const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
         const freq = fd.frequenza || frequenzaDefault(fd);
         if (fd.stato === 'visitata' && gg < freq) return false;
         if (fd.stato === 'assente' && gg < 3) return false;
@@ -3051,7 +3062,7 @@ function markDayDone() {
   if (!day.length) return;
   day.forEach(f => {
     const fd = getFD(f.id);
-    if (!fd.stato || fd.stato === 'da-visitare') setFD(f.id, {stato:'visitata', dataVisita:new Date().toISOString()});
+    if (!fd.stato || fd.stato === 'da-visitare') setFD(f.id, {stato:'visitata', dataVisita:toYMD(new Date())});
   });
   renderDayList(selectedDay);
   refreshDashboard();
