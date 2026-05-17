@@ -919,7 +919,8 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .pa-tab.active .pa-desc { color:var(--green-mid); }
 
 /* Card esiti */
-.card-esiti { display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+.card-esiti { display:flex; gap:4px; margin-top:5px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.card-esiti::-webkit-scrollbar { display:none; }
 .btn-esito { border:none; border-radius:6px; padding:3px 8px; font-size:0.68rem; font-weight:700; cursor:pointer; transition:all .15s; }
 .btn-esito.visitata { background:var(--green-light); color:var(--green); }
 .btn-esito.assente { background:var(--red-light); color:var(--red); }
@@ -939,9 +940,10 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .nav-badge.amber { background:var(--amber); }
 
 /* Escluse panel */
-#escluse-panel { display:none; background:#fff8f8; border-top:2px solid #fecaca; padding:8px 12px; flex-shrink:0; }
-.escluse-hdr { display:flex; justify-content:space-between; font-size:0.75rem; font-weight:700; color:var(--red); cursor:pointer; padding-bottom:6px; }
-.escluse-list { display:flex; flex-direction:column; gap:4px; max-height:130px; overflow-y:auto; }
+#escluse-panel { display:none; flex-direction:column; flex-shrink:0; border-top:2px solid #fecaca; }
+.escluse-hdr { display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; font-weight:700; color:var(--red); cursor:pointer; padding:7px 12px; background:#fff8f8; user-select:none; flex-shrink:0; }
+.escluse-hdr span:last-child { font-size:0.65rem; transition:transform 0.2s; }
+.escluse-list { display:flex; flex-direction:column; gap:4px; max-height:130px; overflow-y:auto; padding:0 12px 8px; background:#fff8f8; }
 .esclusa-item { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #fecaca; border-radius:8px; padding:6px 10px; font-size:0.73rem; }
 .esclusa-item span { flex:1; color:#999; }
 .btn-riammetti { background:var(--green-light); color:var(--green); border:1px solid #a7f3d0; border-radius:6px; padding:3px 8px; font-size:0.68rem; font-weight:600; cursor:pointer; }
@@ -1144,11 +1146,11 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         </div>
         <!-- Pannello farmacie escluse -->
         <div id="escluse-panel">
-          <div class="escluse-hdr" onclick="toggleEscluse()" style="padding:8px 12px;border-radius:8px;background:var(--bg);margin-bottom:4px;">
-            <span>🚫 Escluse dal giro (<span id="escluse-count">0</span>) — tocca per aprire</span>
-            <span id="escluse-arrow">▼</span>
+          <div class="escluse-list" id="escluse-list" style="display:none;"></div>
+          <div class="escluse-hdr" onclick="toggleEscluse()">
+            <span>🚫 Escluse dal giro (<span id="escluse-count">0</span>)</span>
+            <span id="escluse-arrow">▼ mostra</span>
           </div>
-          <div class="escluse-list" id="escluse-list"></div>
         </div>
       </div>
 
@@ -2300,6 +2302,28 @@ function buildRoute() {
   routeDates = getWeekDates(routeWeekOffset);
   const weekStrs = routeDates.map(d => toYMD(d));
 
+  // Seed basato sulla settimana: stessa settimana = stesso giro, settimane diverse = giri diversi
+  const weekSeedBase = routeDates[0]
+    ? Math.floor(new Date(weekStrs[0] + 'T12:00:00').getTime() / 86400000)
+    : 0;
+  function seededRnd(seed) {
+    let s = (seed ^ 0xdeadbeef) >>> 0;
+    return function() {
+      s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+      s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+      s = (s ^ (s >>> 16)) >>> 0;
+      return s / 0xffffffff;
+    };
+  }
+  function seededShuffle(arr, rnd) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   // Score urgenza: più alto = più urgente da visitare
   function urgenzaScore(f) {
     const u = urgenza(f.id);
@@ -2381,6 +2405,23 @@ function buildRoute() {
       });
       pinned.forEach(f => usedIds.add(String(f.id)));
 
+      // STEP 1b: carry-over geografico — farmacie non visitate giorni passati, assegnate a questo giorno
+      const carryToday = (carryOverMap.get(d) || []).filter(f => !usedIds.has(String(f.id)));
+      // Inserite in ordine geografico nearest-neighbor partendo dall'ultimo pinned
+      if (carryToday.length > 0) {
+        let carryLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
+        const remaining = [...carryToday];
+        while (remaining.length > 0) {
+          const nearest = remaining
+            .map((f,i) => ({ f, i, t: travelMinutes(carryLoc, f.loc) }))
+            .sort((a,b) => a.t - b.t)[0];
+          pinned.push(nearest.f);
+          usedIds.add(String(nearest.f.id));
+          carryLoc = nearest.f.loc;
+          remaining.splice(nearest.i, 1);
+        }
+      }
+
       const dayRoute = [...pinned];
       let currentLoc = pinned.length > 0
         ? pinned[pinned.length - 1].loc
@@ -2418,18 +2459,89 @@ function buildRoute() {
     return days;
   }
 
-  // Tre varianti con logica distinta
+  // Tre varianti con logica distinta + seed settimanale per varietà tra settimane
+  const rndA = seededRnd(weekSeedBase * 3 + 1);
+  const rndB = seededRnd(weekSeedBase * 3 + 2);
+  const rndC = seededRnd(weekSeedBase * 3 + 3);
 
-  // A — Ottimale: ordine per urgenza (scaduti+top prima), poi geografico
-  const poolOttimale = [...pool].sort((a,b) => urgenzaScore(b) - urgenzaScore(a));
+  // Carry-over geografico — calcolato prima dei pool, poi escluso dal pool generale: farmacie dei giorni passati non visitate
+  // vengono inserite nel giorno futuro geograficamente più vicino
+  const carryOverMap = new Map(); // dayIdx futuro -> [farmacia, ...]
+  if (routeWeekOffset === 0) {
+    const todayD = new Date(); todayD.setHours(0,0,0,0);
+    const carryFarmacie = [];
+
+    // Raccogli farmacie non visitate dai giorni passati
+    routeDates.forEach((d, i) => {
+      const dd = new Date(d); dd.setHours(0,0,0,0);
+      if (dd < todayD && currentRoute[i]) {
+        currentRoute[i].forEach(f => {
+          const fd = _getFD(f.id);
+          if (!fd.dataVisita || toYMD(fd.dataVisita) < toYMD(d)) {
+            if (!carryFarmacie.find(x => x.id === f.id)) carryFarmacie.push(f);
+          }
+        });
+      }
+    });
+
+    // Per ogni farmacia carry-over, trova il giorno futuro geograficamente più vicino
+    if (carryFarmacie.length > 0) {
+      // Calcola centro geografico di ogni giorno futuro (basato sul pool)
+      const futureDayIdx = routeDates.map((d,i) => {
+        const dd = new Date(d); dd.setHours(0,0,0,0);
+        return dd >= todayD ? i : -1;
+      }).filter(i => i >= 0);
+
+      carryFarmacie.forEach(cf => {
+        let bestDay = futureDayIdx[0] ?? 0;
+        let bestDist = Infinity;
+        futureDayIdx.forEach(di => {
+          // Distanza dalla farmacia carry-over ai pinned/appuntamenti di quel giorno
+          // oppure da Carate Brianza se il giorno è vuoto
+          const dayStr = weekStrs[di];
+          const pinnedDay = FARMACIE.filter(f => {
+            const fd = _getFD(f.id);
+            return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
+          });
+          const refLoc = pinnedDay.length > 0 ? pinnedDay[0].loc : startPoint.label;
+          const dist = travelMinutes(refLoc, cf.loc);
+          if (dist < bestDist) { bestDist = dist; bestDay = di; }
+        });
+        if (!carryOverMap.has(bestDay)) carryOverMap.set(bestDay, []);
+        carryOverMap.get(bestDay).push(cf);
+      });
+    }
+  }
+
+  // Escludi carry-over dal pool generale (vengono pinnate nei giorni giusti da buildDays)
+  const allCarryIds = new Set();
+  carryOverMap.forEach(arr => arr.forEach(f => allCarryIds.add(String(f.id))));
+  const poolClean = pool.filter(f => !allCarryIds.has(String(f.id)));
+
+  // A — Ottimale: urgenza + shuffle parziale per varietà settimanale
+  const poolOttimale = seededShuffle(
+    [...poolClean].sort((a,b) => urgenzaScore(b) - urgenzaScore(a)),
+    rndA
+  ).sort((a,b) => {
+    const aU = urgenzaScore(a); const bU = urgenzaScore(b);
+    if (aU > 150 || bU > 150) return bU - aU;
+    return 0;
+  });
   const percA = buildDays(poolOttimale, priorityOttimale);
 
-  // B — Geografico: puro nearest-neighbor, ignora priorità
-  const poolGeo = [...pool]; // ordine originale, la distanza fa tutto
+  // B — Geografico: shuffle con seed per varietà geografica tra settimane
+  const poolGeo = seededShuffle([...poolClean], rndB);
   const percB = buildDays(poolGeo, priorityGeo);
 
-  // C — Priorità: top clienti prima di tutto, poi scaduti, poi resto
-  const poolPrio = [...pool].sort((a,b) => priorityTop(a) - priorityTop(b));
+  // C — Priorità: top clienti + shuffle per varietà
+  const poolPrio = seededShuffle(
+    [...poolClean].sort((a,b) => priorityTop(a) - priorityTop(b)),
+    rndC
+  ).sort((a,b) => {
+    const aP = priorityTop(a); const bP = priorityTop(b);
+    if (aP <= 2 || bP <= 2) return aP - bP; // top assoluti rimangono in cima
+    return 0;
+  });
   const percC = buildDays(poolPrio, priorityTop);
 
   allPercorsi = [percA, percB, percC];
@@ -2560,7 +2672,7 @@ function renderDayList(dayIdx) {
           <span style="font-size:0.7rem;color:var(--ink3);font-weight:400;margin-left:auto;">${oraAppt || oraStimata}</span>
         </div>
         <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
-        <div class="card-esiti" style="flex-wrap:wrap;gap:5px;">
+        <div class="card-esiti">
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
@@ -2852,10 +2964,10 @@ function renderEscluse() {
   const arrow = document.getElementById('escluse-arrow');
   document.getElementById('escluse-count').textContent = escluseIds.size;
   if (escluseIds.size === 0) { panel.style.display='none'; return; }
-  panel.style.display = 'block';
+  panel.style.display = 'flex';
   // Mantieni stato aperto/chiuso attuale, di default chiuso
   const isOpen = list.style.display === 'flex';
-  if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
+  if (arrow) arrow.textContent = isOpen ? '▲ nascondi' : '▼ mostra';
   list.innerHTML = '';
   escluseIds.forEach(id => {
     const f = escluseData[id] || FARMACIE.find(x=>x.id===id);
@@ -2870,9 +2982,9 @@ function renderEscluse() {
 function toggleEscluse() {
   const l = document.getElementById('escluse-list');
   const a = document.getElementById('escluse-arrow');
-  const v = l.style.display !== 'none';
-  l.style.display = v ? 'none' : 'flex';
-  a.textContent = v ? '▼' : '▲';
+  const isOpen = l.style.display === 'flex';
+  l.style.display = isOpen ? 'none' : 'flex';
+  a.textContent = isOpen ? '▼ mostra' : '▲ nascondi';
 }
 
 // ══════════════════════════════════════════════
