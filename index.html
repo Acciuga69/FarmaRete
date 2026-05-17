@@ -2676,7 +2676,6 @@ function renderDayList(dayIdx) {
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
-          <button class="btn-esito escludi" onclick="escludiFarmacia(event,${f.id})">🚫 Escludi</button>
           <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia')" style="background:#1565c0;color:#fff;font-weight:700;">▶️ Vai</button>
         </div>
       </div>
