@@ -2676,7 +2676,8 @@ function renderDayList(dayIdx) {
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
-          <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia')" style="background:#1565c0;color:#fff;font-weight:700;">▶️ Vai</button>
+          <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia', true)" style="background:#546e7a;color:#fff;font-weight:700;">🗺 Anteprima</button>
+          <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia')" style="background:#1565c0;color:#fff;font-weight:700;">▶ Avvia</button>
         </div>
       </div>
       <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-mb'}">${f.p}</div>
@@ -2808,9 +2809,9 @@ function ricalcolaGiorno(dayIdx) {
     .filter(f => !pinnedIds.has(String(f.id)))
     .map(f => String(f.id)));
 
-  function buildPool(excludeCurrentDay) {
+  function buildPool(excludeCurrentDay, includeOtherDays=false) {
     return FARMACIE.filter(f => {
-      if (usedByOthers.has(String(f.id))) return false;
+      if (!includeOtherDays && usedByOthers.has(String(f.id))) return false;
       if (pinnedIds.has(String(f.id))) return false;
       if (escluseIds.has(String(f.id))) return false;
       if (excludeCurrentDay && currentDayIds.has(String(f.id))) return false;
@@ -2828,9 +2829,12 @@ function ricalcolaGiorno(dayIdx) {
     });
   }
 
-  // Prova prima con pool alternativo, se insufficiente usa pool completo
+  // Pool normale (rispetta assegnazione giorni)
   let pool = buildPool(true);
   if (pool.length < Math.ceil(perDay / 2)) pool = buildPool(false);
+
+  // Pool GPS: include anche farmacie degli altri giorni — se sei in Valtellina, prende la Valtellina
+  const poolGPS = buildPool(false, true);
 
   const pri = (f) => {
     const fd = _getFD(f.id);
@@ -2840,12 +2844,17 @@ function ricalcolaGiorno(dayIdx) {
     return 4;
   };
 
+  // Posizione di partenza reale: GPS se disponibile, altrimenti ultimo pinned, altrimenti startPoint
+  const gpsLoc = (startPoint.lat && startPoint.lng)
+    ? `${startPoint.lat},${startPoint.lng}`
+    : (pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label);
+
   // Funzione che costruisce un giorno da un pool con strategia
   function buildGiorno(poolInput, strategy, seedOffset) {
     const result = [...pinned];
-    let loc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
+    // Parte sempre dalla posizione GPS reale — coerenza geografica garantita
+    let loc = gpsLoc;
     const rem = [...poolInput];
-    // Shuffle con seed diverso per ogni alternativa
     const s = Date.now() + seedOffset;
     for (let i = rem.length - 1; i > 0; i--) {
       const j = Math.floor((s * (i + 1)) % (i + 1));
@@ -2869,9 +2878,10 @@ function ricalcolaGiorno(dayIdx) {
           chosen=cands[0].f; idx=cands[0].i; break;
         }
       }
+      // Fallback: sempre il più vicino geograficamente, mai per priorità assoluta
       if (!chosen) {
         const fb = rem.map((f,i)=>({f,i,t:travelMinutes(loc,f.loc)}))
-          .sort((a,b) => strategy==='geo' ? a.t-b.t : pri(a.f)-pri(b.f)||a.t-b.t);
+          .sort((a,b) => a.t - b.t);
         if (fb.length) { chosen=fb[0].f; idx=fb[0].i; }
       }
       if (!chosen) break;
@@ -2883,16 +2893,13 @@ function ricalcolaGiorno(dayIdx) {
   }
 
   // Genera 3 alternative con strategie diverse
-  const alt1 = buildGiorno(pool, 'ottimale', 0);
+  const alt1 = buildGiorno(poolGPS, 'ottimale', 0);
   const alt3 = buildGiorno(pool, 'priorita', 2000);
 
-  // Geografico: prende GPS reale come punto di partenza
+  // Geografico: usa lo stesso gpsLoc delle altre varianti
   function buildGiornoGPS(poolInput, seedOffset) {
     const result = [...pinned];
-    // Usa GPS se disponibile, altrimenti startPoint
-    let loc = (startPoint.lat && startPoint.lng)
-      ? `${startPoint.lat},${startPoint.lng}`
-      : startPoint.label;
+    let loc = gpsLoc;
     const rem = [...poolInput];
     const s = Date.now() + seedOffset;
     for (let i = rem.length - 1; i > 0; i--) {
@@ -2911,7 +2918,7 @@ function ricalcolaGiorno(dayIdx) {
     }
     return result;
   }
-  const alt2 = buildGiornoGPS(pool, 1000);
+  const alt2 = buildGiornoGPS(poolGPS, 1000);
 
   const alternatives = [
     { label: '⚖️ Ottimale', desc: 'Top scaduti → clienti → caldi → ha ordinato → geografico', day: alt1, color: '#1e8a5e' },
@@ -3012,13 +3019,19 @@ function showMapsPanel(dayIdx) {
   `).join('');
 }
 
-function navigaVerso(indirizzo) {
-  // Apre navigazione diretta verso un singolo indirizzo
+function navigaVerso(indirizzo, preview=false) {
   const dest = encodeURIComponent(indirizzo);
   const origin = startPoint.lat
     ? startPoint.lat + ',' + startPoint.lng
     : encodeURIComponent((startPoint.label || 'posizione attuale') + ', Italia');
-  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+  let url;
+  if (preview) {
+    // Anteprima: mostra la rotta senza avviare navigazione
+    url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+  } else {
+    // Navigazione diretta: salta anteprima e avvia subito
+    url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving&dir_action=navigate`;
+  }
   window.open(url, '_blank');
 }
 
