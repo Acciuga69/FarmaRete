@@ -926,7 +926,13 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .btn-esito.assente { background:var(--red-light); color:var(--red); }
 .btn-esito.richiamo { background:var(--amber-light); color:var(--amber); }
 .btn-esito.escludi { background:#f5f5f5; color:#999; border:1px solid #eee; }
-.btn-esito.active-esito { filter:brightness(0.88); font-weight:800; }
+.btn-esito.ordine { background:#e3f2fd; color:#1565c0; }
+.btn-esito { transition: transform .12s, box-shadow .12s; }
+.btn-esito:active { transform:scale(0.93); opacity:0.8; }
+.btn-esito.visitata.active-esito { background:var(--green); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--green); transform:scale(1.06); }
+.btn-esito.assente.active-esito { background:var(--red); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--red); transform:scale(1.06); }
+.btn-esito.richiamo.active-esito { background:var(--amber); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--amber); transform:scale(1.06); }
+.btn-esito.ordine.active-esito { background:#1565c0; color:#fff; font-weight:800; box-shadow:0 0 0 2.5px #1565c0; transform:scale(1.06); }
 
 /* Card stato visiva */
 .route-item.stato-visitata { border-left:4px solid var(--green); background:var(--green-light); }
@@ -1029,14 +1035,12 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   <!-- ══ PAGE: DASHBOARD ══ -->
   <div id="page-dashboard" class="page active scroll">
     <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <div class="dashboard-greeting">Buongiorno, <span id="greeting-name">buona giornata!</span></div>
-            <div class="dashboard-sub" id="greeting-date">—</div>
-          </div>
-          <button onclick="refreshDashboard()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 16px;font-size:0.8rem;font-weight:700;cursor:pointer;min-height:44px;white-space:nowrap;box-shadow:0 2px 8px rgba(30,138,94,0.3);">🔄 Aggiorna</button>
+      <div style="background:var(--card);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div>
+          <div class="dashboard-greeting">Buongiorno, <span id="greeting-name">buona giornata!</span></div>
+          <div class="dashboard-sub" id="greeting-date">—</div>
         </div>
+        <button onclick="refreshDashboard()" style="background:var(--bg);color:var(--ink2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Aggiorna</button>
       </div>
       <div class="kpi-grid">
         <div class="kpi-card green"><div class="kpi-val" id="kpi-visitate">0</div><div class="kpi-label">Visitate</div></div>
@@ -2378,8 +2382,9 @@ function buildRoute() {
       const dvStr = String(fd.dataVisita).slice(0, 10);
       const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
       const freq = fd.frequenza || frequenzaDefault(fd);
-      if (fd.stato === 'visitata' && gg < freq) return false;
-      if (fd.stato === 'assente' && gg < 3) return false;
+      // dataVisita è la verità: escludi sempre se recente, indipendentemente dallo stato
+      if (fd.stato === 'assente') { if (gg < 3) return false; }
+      else { if (gg < freq) return false; }
     }
     return true;
   });
@@ -2674,6 +2679,7 @@ function renderDayList(dayIdx) {
         <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
         <div class="card-esiti">
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
+          <button class="btn-esito ordine${fd.haOrdine?' active-esito':''}" onclick="quickOrdine(event,${f.id})">📦 Ordine</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
           <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia', true)" style="background:#546e7a;color:#fff;font-weight:700;">🗺 Anteprima</button>
@@ -2724,6 +2730,27 @@ function quickEsito(e, id, esito) {
   autoUploadAfterSave();
   // Dopo ✅ o 🔴: apri navigazione verso la prossima farmacia non visitata
   if (esito === 'visitata' || esito === 'assente') {
+    aggiornaMapsDopoVisita(selectedDay);
+    setTimeout(() => apriProssimaFarmacia(selectedDay), 400);
+  }
+}
+
+function quickOrdine(e, id) {
+  e.stopPropagation();
+  id = String(id);
+  const fd = getFD(id);
+  if (fd.haOrdine) {
+    // Toggle off
+    setFD(id, { haOrdine: false, dataOrdine: null });
+  } else {
+    // Ordine fatto: marca visitata + salva ordine
+    setFD(id, { stato: 'visitata', dataVisita: toYMD(new Date()), haOrdine: true, dataOrdine: toYMD(new Date()), dataAppuntamento: null });
+    localStorage.setItem('farmarete_last_visit', JSON.stringify({id, time: Date.now()}));
+  }
+  renderDayList(selectedDay);
+  updateBadges();
+  autoUploadAfterSave();
+  if (!fd.haOrdine) {
     aggiornaMapsDopoVisita(selectedDay);
     setTimeout(() => apriProssimaFarmacia(selectedDay), 400);
   }
@@ -2835,8 +2862,8 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
         const dvStr = String(fd.dataVisita).slice(0, 10);
         const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
         const freq = fd.frequenza || frequenzaDefault(fd);
-        if (fd.stato === 'visitata' && gg < freq) return false;
-        if (fd.stato === 'assente' && gg < 3) return false;
+        if (fd.stato === 'assente') { if (gg < 3) return false; }
+        else { if (gg < freq) return false; }
       }
       return true;
     });
