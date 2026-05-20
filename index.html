@@ -1272,6 +1272,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
           <button id="modal-ordinato-btn" onclick="toggleOrdinatoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ha ordinato</button>
+          <button id="modal-ordine-btn" onclick="quickOrdineModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
           <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🚫 Escludi</button>
         </div>
       </div>
@@ -1296,6 +1297,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     <div class="modal-actions">
       <button class="btn btn-green" onclick="saveModal()">💾 Salva</button>
       <button class="btn btn-amber" onclick="openMapsSingle()">📍 Mappa</button>
+      <button class="btn" style="background:#546e7a;color:#fff;" onclick="navigaVersoModal()">🗺 Anteprima</button>
       <button class="btn btn-ghost" onclick="closeModal()">Annulla</button>
     </div>
   </div>
@@ -2679,11 +2681,9 @@ function renderDayList(dayIdx) {
         <div class="route-addr">${f.a} · ${f.loc} ${metaHtml} ${travelTag}</div>
         <div class="card-esiti">
           <button class="btn-esito visitata${stato==='visitata'?' active-esito':''}" onclick="quickEsito(event,${f.id},'visitata')">✅ Visita</button>
-          <button class="btn-esito ordine${fd.haOrdine?' active-esito':''}" onclick="quickOrdine(event,${f.id})">📦 Ordine</button>
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
           <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia', true)" style="background:#546e7a;color:#fff;font-weight:700;">🗺 Anteprima</button>
-          <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia')" style="background:#1565c0;color:#fff;font-weight:700;">▶ Avvia</button>
         </div>
       </div>
       <div class="route-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-mb'}">${f.p}</div>
@@ -3052,6 +3052,32 @@ function showMapsPanel(dayIdx) {
       <span style="color:var(--green);font-size:0.8rem;">▶</span>
     </div>
   `).join('');
+}
+
+function navigaVersoModal() {
+  const f = FARMACIE.find(x => x.id === currentFarmaciaId);
+  if (f) navigaVerso(`${f.a}, ${f.loc}, Italia`, true);
+}
+
+function quickOrdineModal() {
+  if (!currentFarmaciaId) return;
+  const id = String(currentFarmaciaId);
+  const fd = getFD(id);
+  if (fd.haOrdine) {
+    setFD(id, { haOrdine: false, dataOrdine: null });
+  } else {
+    setFD(id, { stato: 'visitata', dataVisita: toYMD(new Date()), haOrdine: true, dataOrdine: toYMD(new Date()), dataAppuntamento: null });
+  }
+  // Aggiorna visual bottone
+  const btn = document.getElementById('modal-ordine-btn');
+  const haOrdine = getFD(id).haOrdine;
+  if (btn) {
+    btn.style.background = haOrdine ? '#1565c0' : 'var(--card)';
+    btn.style.color = haOrdine ? '#fff' : '';
+    btn.textContent = haOrdine ? '📦 Ordine ✓' : '📦 Ordine oggi';
+  }
+  updateBadges();
+  autoUploadAfterSave();
 }
 
 function navigaVerso(indirizzo, preview=false) {
