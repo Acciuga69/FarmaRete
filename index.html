@@ -2785,6 +2785,19 @@ function ripristinaFarmacia(id) {
   showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
 function ricalcolaGiorno(dayIdx) {
+  // Prendi GPS reale del dispositivo, poi calcola
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => _eseguiRicalcola(dayIdx, { lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      ()  => _eseguiRicalcola(dayIdx, null),
+      { timeout: 5000, maximumAge: 30000 }
+    );
+  } else {
+    _eseguiRicalcola(dayIdx, null);
+  }
+}
+
+function _eseguiRicalcola(dayIdx, deviceGPS) {
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
@@ -2844,10 +2857,12 @@ function ricalcolaGiorno(dayIdx) {
     return 4;
   };
 
-  // Posizione di partenza reale: GPS se disponibile, altrimenti ultimo pinned, altrimenti startPoint
-  const gpsLoc = (startPoint.lat && startPoint.lng)
-    ? `${startPoint.lat},${startPoint.lng}`
-    : (pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label);
+  // Posizione reale: GPS del dispositivo > startPoint configurato > ultimo pinned > default
+  const gpsLoc = deviceGPS
+    ? `${deviceGPS.lat},${deviceGPS.lng}`
+    : (startPoint.lat && startPoint.lng)
+      ? `${startPoint.lat},${startPoint.lng}`
+      : (pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label);
 
   // Funzione che costruisce un giorno da un pool con strategia
   function buildGiorno(poolInput, strategy, seedOffset) {
@@ -3021,18 +3036,16 @@ function showMapsPanel(dayIdx) {
 
 function navigaVerso(indirizzo, preview=false) {
   const dest = encodeURIComponent(indirizzo);
-  const origin = startPoint.lat
-    ? startPoint.lat + ',' + startPoint.lng
-    : encodeURIComponent((startPoint.label || 'posizione attuale') + ', Italia');
-  let url;
-  if (preview) {
-    // Anteprima: mostra la rotta senza avviare navigazione
-    url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-  } else {
-    // Navigazione diretta: salta anteprima e avvia subito
-    url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving&dir_action=navigate`;
-  }
-  window.open(url, '_blank');
+  const url = preview
+    ? `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving&dir_action=navigate`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function apriProssimaFarmacia(dayIdx) {
