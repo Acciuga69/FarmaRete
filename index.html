@@ -1148,14 +1148,6 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div class="route-list scroll" id="route-list">
           <div class="empty-state"><div class="icon">🗺️</div><h4>Nessun percorso</h4><p>Configura i parametri e premi "Genera percorsi".</p></div>
         </div>
-        <!-- Pannello farmacie escluse -->
-        <div id="escluse-panel">
-          <div class="escluse-list" id="escluse-list" style="display:none;"></div>
-          <div class="escluse-hdr" onclick="toggleEscluse()">
-            <span>🚫 Escluse dal giro (<span id="escluse-count">0</span>)</span>
-            <span id="escluse-arrow">▼ mostra</span>
-          </div>
-        </div>
       </div>
 
       <div class="map-wrap">
@@ -1203,6 +1195,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <div class="filter-chip fc-richiamare" data-filter="richiamare" onclick="setFilter('richiamare',this)">📞 Richiamare</div>
       <div class="filter-chip" data-filter="top" onclick="setFilter('top',this)">⭐ Top</div>
       <div class="filter-chip" data-filter="scaduta" onclick="setFilter('scaduta',this)">⏰ Scadute</div>
+      <div class="filter-chip" data-filter="escluse" onclick="setFilter('escluse',this)" style="color:var(--red);border-color:var(--red);">🚫 Escluse</div>
     </div>
     <div class="farmacie-list scroll" id="farmacie-list"></div>
   </div>
@@ -3000,33 +2993,18 @@ function chiudiRicalcolaPanel(e) {
 }
 
 function renderEscluse() {
-  const panel = document.getElementById('escluse-panel');
-  const list = document.getElementById('escluse-list');
-  const arrow = document.getElementById('escluse-arrow');
-  document.getElementById('escluse-count').textContent = escluseIds.size;
-  if (escluseIds.size === 0) { panel.style.display='none'; return; }
-  panel.style.display = 'flex';
-  // Mantieni stato aperto/chiuso attuale, di default chiuso
-  const isOpen = list.style.display === 'flex';
-  if (arrow) arrow.textContent = isOpen ? '▲ nascondi' : '▼ mostra';
-  list.innerHTML = '';
-  escluseIds.forEach(id => {
-    const f = escluseData[id] || FARMACIE.find(x=>x.id===id);
-    const nome = f ? `${f.n} — ${f.loc}` : id;
-    const item = document.createElement('div');
-    item.className = 'esclusa-item';
-    item.innerHTML = `<span>${nome}</span><button class="btn-riammetti">✓ Riammetti</button>`;
-    item.querySelector('.btn-riammetti').onclick = () => ripristinaFarmacia(id);
-    list.appendChild(item);
-  });
+  // Il pannello escluse è stato spostato nella sezione Farmacie (filtro 🚫 Escluse)
+  // Aggiorna il chip se siamo nella sezione farmacie
+  const chip = document.querySelector('.filter-chip[data-filter="escluse"]');
+  if (chip) {
+    chip.textContent = escluseIds.size > 0
+      ? `🚫 Escluse (${escluseIds.size})`
+      : '🚫 Escluse';
+  }
+  // Se il filtro escluse è attivo, aggiorna la lista
+  if (currentFilter === 'escluse') renderFarmacie();
 }
-function toggleEscluse() {
-  const l = document.getElementById('escluse-list');
-  const a = document.getElementById('escluse-arrow');
-  const isOpen = l.style.display === 'flex';
-  l.style.display = isOpen ? 'none' : 'flex';
-  a.textContent = isOpen ? '▼ mostra' : '▲ nascondi';
-}
+function toggleEscluse() {} // rimosso, pannello non più nel percorso
 
 // ══════════════════════════════════════════════
 // MAPPE
@@ -3323,6 +3301,7 @@ function renderFarmacie() {
   else if (currentFilter==='richiamare') pool = pool.filter(f => (data[String(f.id)]||{}).stato==='richiamare');
   else if (currentFilter==='top') pool = pool.filter(f => (data[String(f.id)]||{}).isTop);
   else if (currentFilter==='scaduta') pool = pool.filter(f => isScaduta(f.id));
+  else if (currentFilter==='escluse') pool = pool.filter(f => escluseIds.has(String(f.id)));
 
   list.innerHTML = '';
   if (!pool.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔍</div><h4>Nessun risultato</h4></div>'; return; }
@@ -3343,6 +3322,7 @@ function renderFarmacie() {
         <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.priorita==='caldo'?'🔴 ':fd.priorita==='tiepido'?'🟡 ':fd.isProspect?'🔍 ':''}${fd.haOrdinato?'📦 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
         <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
         ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
+      ${isEsclusa ? `<div style="font-size:0.68rem;color:var(--red);margin-top:2px;">🚫 Esclusa dal giro · <span style="text-decoration:underline;cursor:pointer;" onclick="event.stopPropagation();ripristinaFarmacia(${f.id})">Riammetti</span></div>` : ''}
       </div>
       <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-mb'}">${f.p}</div>
     `;
