@@ -498,8 +498,10 @@ input[type=number] { width: 62px; }
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
 }
+.farmacie-filters::-webkit-scrollbar { display:none; }
 .filter-chip {
   padding: 5px 12px;
   border-radius: 20px;
