@@ -1185,6 +1185,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     </div>
     <div class="farmacie-filters" id="farmacie-filters">
       <div class="filter-chip active" data-filter="all" onclick="setFilter('all',this)">Tutte</div>
+      <div class="filter-chip" data-filter="escluse" onclick="setFilter('escluse',this)" style="color:var(--red);border-color:var(--red);">🚫 Escluse</div>
       <div class="filter-chip" data-filter="MB" onclick="setFilter('MB',this)">MB</div>
       <div class="filter-chip" data-filter="LC" onclick="setFilter('LC',this)">LC</div>
       <div class="filter-chip" data-filter="SO" onclick="setFilter('SO',this)">SO</div>
@@ -1195,7 +1196,6 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <div class="filter-chip fc-richiamare" data-filter="richiamare" onclick="setFilter('richiamare',this)">📞 Richiamare</div>
       <div class="filter-chip" data-filter="top" onclick="setFilter('top',this)">⭐ Top</div>
       <div class="filter-chip" data-filter="scaduta" onclick="setFilter('scaduta',this)">⏰ Scadute</div>
-      <div class="filter-chip" data-filter="escluse" onclick="setFilter('escluse',this)" style="color:var(--red);border-color:var(--red);">🚫 Escluse</div>
     </div>
     <div class="farmacie-list scroll" id="farmacie-list"></div>
   </div>
