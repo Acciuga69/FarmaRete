@@ -996,6 +996,23 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .freq-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 5px; border-radius:5px; margin-left:4px; }
 .freq-top { background:var(--amber-light); color:var(--amber); }
 .freq-normal { background:var(--blue-light); color:var(--blue); }
+
+/* activity-meta alias */
+.activity-meta { font-size:0.71rem; color:var(--ink3); margin-top:1px; }
+
+/* route-item hover + focus-visible */
+.route-item { transition: box-shadow .15s, transform .1s; }
+.route-item:hover { box-shadow: var(--shadow); }
+
+/* Day progress bar */
+#day-progress-wrap { display:none; }
+
+/* Filter chip active states */
+.filter-chip.fc-caldo.active { background:var(--red-light); color:var(--red); border-color:var(--red); }
+.filter-chip.fc-tiepido.active { background:var(--amber-light); color:var(--amber); border-color:var(--amber); }
+.filter-chip.fc-freddo.active { background:var(--blue-light); color:var(--blue); border-color:var(--blue); }
+.filter-chip.fc-visitata.active { background:var(--green-light); color:var(--green); border-color:var(--green); }
+.filter-chip.fc-richiamare.active { background:var(--amber-light); color:var(--amber); border-color:var(--amber); }
 </style>
 </head>
 <body>
@@ -1111,7 +1128,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       </div>
       <div class="controls-row">
         <button class="btn btn-green" onclick="buildRoute()">⚙ Genera percorsi</button>
-        <button class="btn" style="font-size:0.75rem;padding:8px;" onclick="diagAppt()">🔍 Debug</button>
+        <button class="btn btn-ghost" style="font-size:0.75rem;padding:8px;" onclick="condividiPercorso()" title="Condividi percorso">📤 Condividi</button>
         <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
           <button class="btn" style="padding:8px 12px;font-size:0.85rem;" onclick="changeWeek(-1)">◀</button>
           <span id="week-label" style="font-size:0.78rem;font-weight:600;color:var(--ink2);white-space:nowrap;">Sett. corrente</span>
@@ -1144,12 +1161,23 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 
     <div class="percorso-body">
       <div class="route-list-wrap">
-        <div class="route-list-header">
-          <span id="route-list-label">Genera un percorso</span>
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span id="route-list-count"></span>
-            <button id="btn-ricalcola-day" onclick="ricalcolaGiorno(selectedDay)" style="display:none;font-size:0.72rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-weight:600;">🔄 Ricalcola</button>
-          </span>
+        <div class="route-list-header" style="flex-direction:column;gap:6px;padding:10px 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <span id="route-list-label">Genera un percorso</span>
+            <span style="display:flex;align-items:center;gap:8px;">
+              <span id="route-list-count"></span>
+              <button id="btn-ricalcola-day" onclick="ricalcolaGiorno(selectedDay)" style="display:none;font-size:0.72rem;padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-weight:600;">🔄 Ricalcola</button>
+            </span>
+          </div>
+          <div id="day-progress-wrap" style="display:none;width:100%;">
+            <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--ink3);margin-bottom:3px;">
+              <span id="day-progress-label">0 visitate</span>
+              <span id="day-progress-pct">0%</span>
+            </div>
+            <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+              <div id="day-progress-bar" style="height:100%;background:var(--green-mid);border-radius:3px;transition:width .4s ease;width:0%;"></div>
+            </div>
+          </div>
         </div>
         <div class="route-list scroll" id="route-list">
           <div class="empty-state"><div class="icon">🗺️</div><h4>Nessun percorso</h4><p>Configura i parametri e premi "Genera percorsi".</p></div>
@@ -1208,13 +1236,19 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 
   <!-- ══ PAGE: SCADENZE ══ -->
   <div id="page-scadenze" class="page scroll" style="padding:12px;">
-    <div class="section-title" style="margin-bottom:10px;">⏰ Farmacie da visitare</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div class="section-title" style="margin-bottom:0;">⏰ Farmacie da visitare</div>
+      <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderScadenze()">🔄 Aggiorna</button>
+    </div>
     <div id="scadenze-list"></div>
   </div>
 
   <!-- ══ PAGE: RICHIAMI ══ -->
   <div id="page-richiami" class="page scroll" style="padding:12px;">
-    <div class="section-title" style="margin-bottom:10px;">🔁 Richiami in sospeso</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div class="section-title" style="margin-bottom:0;">🔁 Richiami in sospeso</div>
+      <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderRichiami()">🔄 Aggiorna</button>
+    </div>
     <div id="richiami-list"></div>
   </div>
 
@@ -2691,6 +2725,26 @@ function renderDayList(dayIdx) {
   });
 
   document.getElementById('map-toolbar-info').innerHTML = `📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate`;
+  
+  // Progress bar giornaliera
+  const todayYMD2 = toYMD(new Date());
+  const isToday2 = routeDates[dayIdx] && toYMD(routeDates[dayIdx]) === todayYMD2;
+  const visitateOggi = day.filter(f => {
+    const fd = data[String(f.id)] || {};
+    return (fd.stato === 'visitata' || fd.stato === 'assente') && fd.dataVisita === todayYMD2;
+  }).length;
+  const progressWrap = document.getElementById('day-progress-wrap');
+  if (isToday2 && day.length > 0) {
+    progressWrap.style.display = 'block';
+    const pct = Math.round((visitateOggi / day.length) * 100);
+    document.getElementById('day-progress-label').textContent = `${visitateOggi}/${day.length} gestite oggi`;
+    document.getElementById('day-progress-pct').textContent = pct + '%';
+    document.getElementById('day-progress-bar').style.width = pct + '%';
+    document.getElementById('day-progress-bar').style.background = pct === 100 ? 'var(--green)' : 'var(--green-mid)';
+  } else {
+    progressWrap.style.display = 'none';
+  }
+  
   showMapsPanel(dayIdx);
 }
 
@@ -2727,7 +2781,7 @@ function quickEsito(e, id, esito) {
   renderDayList(selectedDay);
   updateBadges();
   autoUploadAfterSave();
-
+  haptic(esito === 'visitata' ? 'success' : 'light');
 }
 
 function quickOrdine(e, id) {
@@ -3163,7 +3217,7 @@ function openGoogleMaps() {
   if (!day.length) return;
   if (isAndroid()) {
     // Android: usa geo: intent che apre Google Maps direttamente
-    const origin = encodeURIComponent('Carate Brianza, MB, Italia');
+    const origin = encodeURIComponent((startPoint.lat ? startPoint.lat + ',' + startPoint.lng : startPoint.label + ', Italia'));
     const dest = encodeURIComponent(day[day.length-1].a + ', ' + day[day.length-1].loc + ', Italia');
     const wps = day.slice(0,-1).slice(0,8).map(f => encodeURIComponent(f.a + ', ' + f.loc + ', Italia')).join('|');
     const googleUrl = 'https://www.google.com/maps/dir/?api=1&origin=' + origin + '&destination=' + dest + '&travelmode=driving' + (wps ? '&waypoints=' + wps : '');
@@ -3233,7 +3287,8 @@ function markDayDone() {
   });
   renderDayList(selectedDay);
   refreshDashboard();
-  alert(`✅ Giorno ${selectedDay+1} completato! ${day.length} farmacie segnate come visitate.`);
+  haptic('medium');
+  showToast(`🎉 Giorno ${selectedDay+1} completato! ${day.length} farmacie gestite.`, 'ok');
 }
 
 function resetRoute() {
@@ -3255,18 +3310,54 @@ function renderScadenze() {
   const prov = document.getElementById('prov-filter').value;
   const list = document.getElementById('scadenze-list');
   const scadute = FARMACIE
-    .filter(f => (prov==='ALL'||f.p===prov) && isScaduta(f.id))
-    .sort((a,b) => giorniDaUltima(b.id)-giorniDaUltima(a.id));
+    .filter(f => (prov==='ALL'||f.p===prov) && isScaduta(f.id) && !escluseIds.has(String(f.id)))
+    .sort((a,b) => {
+      const ua = urgenza(a.id), ub = urgenza(b.id);
+      const fa = getFD(a.id), fb = getFD(b.id);
+      // Top client scaduti prima, poi per urgenza
+      if (fa.isTop !== fb.isTop) return fa.isTop ? -1 : 1;
+      return ub - ua;
+    });
   if (!scadute.length) { list.innerHTML='<div class="empty-state"><div class="icon">✅</div><h4>Nessuna scadenza!</h4><p>Tutte le farmacie sono in regola.</p></div>'; return; }
   list.innerHTML = scadute.map(f => {
     const gg = giorniDaUltima(f.id);
     const fd = getFD(f.id);
-    return `<div class="scad-item urgente" onclick="openModal(${f.id})">
-      <div class="scad-nome">${fd.isTop?'⭐ ':''}${f.n}</div>
-      <div class="scad-meta">📍 ${f.loc} · ${f.p}</div>
-      <div class="scad-urgenza">${gg===Infinity?'Mai visitata':'Non visitata da '+gg+' giorni'}</div>
+    const freq = frequenza(f.id);
+    const u = Math.min(urgenza(f.id), 3);
+    const pctOverdue = Math.min(Math.round((gg / freq) * 100), 300);
+    const barColor = u >= 2 ? 'var(--red)' : u >= 1.5 ? '#f97316' : 'var(--amber)';
+    const prioBadge = fd.isTop ? '<span style="font-size:0.62rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">⭐ TOP</span>'
+      : fd.isCliente ? '<span style="font-size:0.62rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🤝 CLI</span>'
+      : fd.priorita==='caldo' ? '<span style="font-size:0.62rem;font-weight:700;background:var(--red);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🔴 Caldo</span>'
+      : fd.priorita==='tiepido' ? '<span style="font-size:0.62rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🟡 Tiepido</span>'
+      : '';
+    const scadText = gg === Infinity ? '🚫 Mai visitata' : `⏰ Non vista da <strong>${gg}</strong> giorni (freq: ${freq}gg)`;
+    return `<div class="scad-item urgente" style="border-left:4px solid ${barColor};cursor:pointer;" onclick="openModal(${f.id})">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div class="scad-nome">${prioBadge}${fd.nomeCustom||f.n}</div>
+          <div class="scad-meta">📍 ${f.loc} · ${f.p}${fd.note?` · 📝 ${fd.note.slice(0,40)}…`:''}</div>
+          <div class="scad-urgenza" style="color:${barColor};margin-top:3px;">${scadText}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(pctOverdue,100)}%;background:${barColor};border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+          <button class="btn btn-green" style="font-size:0.68rem;padding:4px 8px;min-height:32px;" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia',true)">🗺 Vai</button>
+          <button class="btn btn-amber" style="font-size:0.68rem;padding:4px 8px;min-height:32px;" onclick="event.stopPropagation();quickEsitoScad(${f.id},'visitata')">✅</button>
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function quickEsitoScad(id, esito) {
+  setFD(String(id), { stato: esito, dataVisita: toYMD(new Date()), dataAppuntamento: null });
+  renderScadenze();
+  updateBadges();
+  autoUploadAfterSave();
+  haptic('light');
+  showToast('✅ Visita registrata!', 'ok');
 }
 
 function renderRichiami() {
@@ -3274,16 +3365,44 @@ function renderRichiami() {
   const richiami = FARMACIE.filter(f => getFD(f.id).stato === 'richiamare');
   if (!richiami.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔁</div><h4>Nessun richiamo</h4><p>Nessuna farmacia da richiamare.</p></div>'; return; }
   const data = loadData();
+  // Ordina per data segnalazione (prima i più vecchi)
+  richiami.sort((a,b) => {
+    const da = data[String(a.id)]?.dataVisita || '9999';
+    const db = data[String(b.id)]?.dataVisita || '9999';
+    return da.localeCompare(db);
+  });
   list.innerHTML = richiami.map(f => {
     const fd = data[String(f.id)]||{};
-    return `<div class="scad-item" style="border-left:4px solid var(--amber);" onclick="openModal(${f.id})">
-      <div class="scad-nome">${f.n}</div>
-      <div class="scad-meta">📍 ${f.loc} · segnato il ${formatDate(fd.dataVisita)}</div>
-      <div style="margin-top:6px;">
-        <button class="btn btn-green" style="font-size:0.72rem;padding:5px 10px;" onclick="quickEsito(event,${f.id},'visitata')">✅ Fatto</button>
+    const gg = fd.dataVisita ? Math.floor((Date.now() - new Date(fd.dataVisita+'T12:00:00').getTime()) / 86400000) : null;
+    const prioBadge = fd.isTop ? '<span style="font-size:0.62rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">⭐ TOP</span>'
+      : fd.isCliente ? '<span style="font-size:0.62rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🤝 CLI</span>' : '';
+    const attesaColor = gg > 14 ? 'var(--red)' : gg > 7 ? 'var(--amber)' : 'var(--ink3)';
+    return `<div class="scad-item" style="border-left:4px solid var(--amber);cursor:pointer;" onclick="openModal(${f.id})">
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div class="scad-nome">${prioBadge}${fd.nomeCustom||f.n}</div>
+          <div class="scad-meta">📍 ${f.loc} · ${f.p}${fd.telefono?` · 📞 ${fd.telefono}`:''}</div>
+          ${fd.note ? `<div style="font-size:0.72rem;color:var(--ink2);margin-top:4px;padding:5px 8px;background:var(--amber-light);border-radius:6px;">📝 ${fd.note}</div>` : ''}
+          <div style="font-size:0.68rem;margin-top:4px;color:${attesaColor};font-weight:600;">
+            🔁 Segnato ${gg !== null ? (gg===0?'oggi':gg===1?'ieri':gg+' giorni fa') : 'il '+formatDate(fd.dataVisita)}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+          <button class="btn btn-green" style="font-size:0.68rem;padding:4px 8px;min-height:32px;" onclick="event.stopPropagation();quickEsitoRich(${f.id},'visitata')">✅ Fatto</button>
+          <button class="btn btn-ghost" style="font-size:0.68rem;padding:4px 8px;min-height:32px;" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia',true)">🗺 Vai</button>
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+function quickEsitoRich(id, esito) {
+  setFD(String(id), { stato: esito, dataVisita: toYMD(new Date()), dataAppuntamento: null });
+  renderRichiami();
+  updateBadges();
+  autoUploadAfterSave();
+  haptic('light');
+  showToast('✅ Richiamo completato!', 'ok');
 }
 
 // ══════════════════════════════════════════════
@@ -3593,6 +3712,9 @@ function saveModal() {
     if (activePage.id==='page-scadenze') renderScadenze();
     if (activePage.id==='page-richiami') renderRichiami();
   }
+  closeModal();
+  showToast('💾 Salvato!', 'ok');
+  haptic('light');
 }
 
 // ══════════════════════════════════════════════
@@ -3760,6 +3882,50 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
   ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
   ctx.closePath();
+}
+
+// ══════════════════════════════════════════════
+// UTILITY: HAPTIC + TOAST + CONDIVIDI
+// ══════════════════════════════════════════════
+function haptic(type) {
+  try {
+    if (!navigator.vibrate) return;
+    if (type === 'light') navigator.vibrate(10);
+    else if (type === 'medium') navigator.vibrate([20, 30, 20]);
+    else if (type === 'success') navigator.vibrate([10, 50, 30]);
+  } catch(e) {}
+}
+
+function showToast(msg, type) {
+  const existing = document.getElementById('app-toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'app-toast';
+  const bg = type === 'ok' ? 'var(--green)' : type === 'err' ? 'var(--red)' : '#1a1a2e';
+  el.style.cssText = `position:fixed;bottom:calc(var(--nav-h,60px) + var(--safe-bottom) + 14px);left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:10px 20px;border-radius:12px;font-size:0.8rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.25);animation:slideUp .3s ease;white-space:nowrap;max-width:calc(100vw - 40px);text-align:center;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+
+async function condividiPercorso() {
+  const day = currentRoute[selectedDay] || [];
+  if (!day.length) { showToast('⚠️ Nessun percorso da condividere', ''); return; }
+  const labels = ['Ottimale','Geografico','Priorità'];
+  const d = routeDates[selectedDay];
+  const dateStr = d ? d.toLocaleDateString('it-IT', {weekday:'long', day:'numeric', month:'long'}) : `Giorno ${selectedDay+1}`;
+  const lines = day.map((f,i) => `${i+1}. ${f.n} — ${f.loc}`).join('\n');
+  const text = `📋 FarmaRete — Percorso ${labels[currentPercorsoIdx]}\n📅 ${dateStr}\n🏁 Partenza: ${startPoint.label}\n\n${lines}\n\n${day.length} fermate totali`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'FarmaRete — Percorso del giorno', text });
+    } else {
+      await navigator.clipboard.writeText(text);
+      showToast('📋 Percorso copiato negli appunti!', 'ok');
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') showToast('❌ Impossibile condividere', 'err');
+  }
 }
 
 // ══════════════════════════════════════════════
