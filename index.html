@@ -824,7 +824,8 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
   .percorso-body { flex-direction: column; }
-  .route-list-wrap { width: 100%; max-height: 42svh; border-right: none; border-bottom: 1px solid var(--border); }
+  .route-list-wrap { width: 100%; height: 44svh; max-height: 44svh; border-right: none; border-bottom: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+  .route-list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 80px; }
   .map-wrap { min-height: 35svh; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
@@ -3079,7 +3080,7 @@ function showMapsPanel(dayIdx) {
 
   const labels = ['Ottimale','Priorità','Scadenze'];
   document.getElementById('maps-panel-title').textContent = `Percorso ${labels[currentPercorsoIdx]} — Giorno ${dayIdx+1}`;
-  document.getElementById('maps-panel-desc').textContent = `${day.length} farmacie · partenza Carate Brianza`;
+  document.getElementById('maps-panel-desc').textContent = `${day.length} farmacie · partenza ${startPoint.label}`;
 
   buildMapsUrls(day);
 
@@ -3225,7 +3226,7 @@ function openGoogleMaps() {
   } else if (isIOS()) {
     // iOS: prova app nativa, fallback web
     const c = COORDS[(day[0]||{}).loc] || {lat:45.69, lng:9.24};
-    window.location.href = 'comgooglemaps://?saddr=Carate+Brianza&daddr=' + c.lat + ',' + c.lng + '&directionsmode=driving';
+    window.location.href = 'comgooglemaps://?saddr=' + encodeURIComponent(startPoint.lat ? startPoint.lat + ',' + startPoint.lng : startPoint.label) + '&daddr=' + c.lat + ',' + c.lng + '&directionsmode=driving';
     setTimeout(() => window.open(window._gUrl, '_blank'), 800);
   } else {
     window.open(window._gUrl, '_blank');
