@@ -3586,7 +3586,7 @@ function openModal(id) {
     escludiEl.dataset.active = isEsc ? 'true' : 'false';
     escludiEl.style.background = isEsc ? 'var(--red-light)' : '#fff';
     escludiEl.style.borderColor = 'var(--red)';
-    escludiEl.style.color = 'var(--red)';
+    escludiEl.style.color = isEsc ? '#991b1b' : 'var(--red)';
     escludiEl.textContent = isEsc ? '🔓 Includi' : '🚫 Escludi';
   }
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
@@ -3639,7 +3639,7 @@ function toggleEscludiModal() {
   btn.dataset.active = isActive ? 'false' : 'true';
   btn.style.background = isActive ? '#fff' : 'var(--red-light)';
   btn.style.borderColor = 'var(--red)';
-  btn.style.color = 'var(--red)';
+  btn.style.color = isActive ? 'var(--red)' : '#991b1b';
   btn.textContent = isActive ? '🚫 Escludi' : '🔓 Includi';
 }
 
