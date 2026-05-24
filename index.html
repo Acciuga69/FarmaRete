@@ -825,7 +825,8 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
   .percorso-body { flex-direction: column; flex: none; overflow: visible; }
   .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible; display: block; border-right: none; border-bottom: 1px solid var(--border); }
-  .route-list { flex: none; height: auto; overflow: visible; padding-bottom: 20px; }
+  .route-list { flex: none; height: calc(100svh - 310px); max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 20px; }
+  #page-percorso { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
   .map-wrap { min-height: 35svh; flex-shrink: 0; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
