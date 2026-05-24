@@ -825,7 +825,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
   .percorso-body { flex-direction: column; flex: none; overflow: visible; }
   .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible; display: block; border-right: none; border-bottom: 1px solid var(--border); }
-  .route-list { flex: none; height: calc(100svh - 310px); max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 20px; }
+  .route-list { flex: none; height: calc(100svh - 310px); max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 120px; }
   #page-percorso { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
   .map-wrap { min-height: 35svh; flex-shrink: 0; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -994,7 +994,9 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 /* Star top client */
 .star-btn { background:none; border:none; font-size:1rem; cursor:pointer; padding:0 2px; line-height:1; }
 
-/* Frequency badge */
+/* Escludi button states */
+#modal-escludi-btn { border: 1.5px solid var(--red) !important; background: #fff !important; color: var(--red) !important; }
+#modal-escludi-btn.is-esclusa { background: var(--red-light) !important; color: #991b1b !important; }
 .freq-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 5px; border-radius:5px; margin-left:4px; }
 .freq-top { background:var(--amber-light); color:var(--amber); }
 .freq-normal { background:var(--blue-light); color:var(--blue); }
@@ -3585,9 +3587,7 @@ function openModal(id) {
     loadEscluse();
     const isEsc = escluseIds.has(String(id));
     escludiEl.dataset.active = isEsc ? 'true' : 'false';
-    escludiEl.style.background = isEsc ? 'var(--red-light)' : '#fff';
-    escludiEl.style.borderColor = 'var(--red)';
-    escludiEl.style.color = isEsc ? '#991b1b' : 'var(--red)';
+    escludiEl.classList.toggle('is-esclusa', isEsc);
     escludiEl.textContent = isEsc ? '🔓 Includi' : '🚫 Escludi';
   }
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
@@ -3638,9 +3638,7 @@ function toggleEscludiModal() {
   const btn = document.getElementById('modal-escludi-btn');
   const isActive = btn.dataset.active === 'true';
   btn.dataset.active = isActive ? 'false' : 'true';
-  btn.style.background = isActive ? '#fff' : 'var(--red-light)';
-  btn.style.borderColor = 'var(--red)';
-  btn.style.color = isActive ? 'var(--red)' : '#991b1b';
+  btn.classList.toggle('is-esclusa', !isActive);
   btn.textContent = isActive ? '🚫 Escludi' : '🔓 Includi';
 }
 
@@ -3686,7 +3684,6 @@ function saveModal() {
     update.dataAppuntamento = null;
   }
   setFD(currentFarmaciaId, update);
-  closeModal();
   autoUploadAfterSave();
   refreshDashboard();
   updateBadges();
