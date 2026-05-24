@@ -300,7 +300,7 @@ body {
 /* ══════════════════════════
    PAGINA 2: PERCORSO
 ══════════════════════════ */
-#page-percorso { flex-direction: column; }
+#page-percorso { flex-direction: column; overflow-y: auto; }
 
 .percorso-controls {
   background: var(--card);
@@ -714,13 +714,13 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 /* ── PHONE (<700px) ── */
 @media (max-width: 700px) {
   .topbar-search { display: none; }
-  .percorso-body { flex-direction: column; }
-  .route-list-wrap { width: 100%; height: 45svh; max-height: 45svh; border-right: none; border-bottom: 1px solid var(--border); overflow: hidden; }
-  .route-list { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .map-wrap { min-height: 30svh; }
+  .percorso-body { flex-direction: column; overflow: visible; }
+  .route-list-wrap { width: 100%; height: auto; max-height: none; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+  .route-list { height: auto; overflow-y: visible; padding-bottom: 16px; }
+  .map-wrap { min-height: 35svh; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
-  select, input[type=number], input[type=text], textarea { font-size: 16px !important; } /* prevent iOS zoom */
+  select, input[type=number], input[type=text], textarea { font-size: 16px !important; }
 }
 
 /* ── IPAD / TABLET (700-1200px) ── */
