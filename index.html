@@ -823,9 +823,9 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     background: none;
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
-  .percorso-body { flex-direction: column; }
-  .route-list-wrap { width: 100%; height: 44svh; max-height: 44svh; border-right: none; border-bottom: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
-  .route-list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 80px; }
+  .percorso-body { flex-direction: column; overflow: visible; }
+  .route-list-wrap { width: 100%; height: auto; max-height: none; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; display: block; }
+  .route-list { flex: none; height: auto; overflow-y: visible; padding-bottom: 16px; }
   .map-wrap { min-height: 35svh; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
@@ -1307,7 +1307,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
           <button id="modal-ordinato-btn" onclick="toggleOrdinatoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ha ordinato</button>
           <button id="modal-ordine-btn" onclick="quickOrdineModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
-          <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🚫 Escludi</button>
+          <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--red);background:#fff;color:var(--red);font-size:0.78rem;font-weight:700;cursor:pointer;">🚫 Escludi</button>
         </div>
       </div>
       <div>
@@ -3584,9 +3584,9 @@ function openModal(id) {
     loadEscluse();
     const isEsc = escluseIds.has(String(id));
     escludiEl.dataset.active = isEsc ? 'true' : 'false';
-    escludiEl.style.background = isEsc ? 'var(--red-light)' : 'var(--card)';
-    escludiEl.style.borderColor = isEsc ? 'var(--red)' : 'var(--border)';
-    escludiEl.style.color = isEsc ? 'var(--red)' : '';
+    escludiEl.style.background = isEsc ? 'var(--red-light)' : '#fff';
+    escludiEl.style.borderColor = 'var(--red)';
+    escludiEl.style.color = 'var(--red)';
     escludiEl.textContent = isEsc ? '🔓 Includi' : '🚫 Escludi';
   }
   starBtn.textContent = fd.isTop ? '⭐' : '☆';
@@ -3637,9 +3637,9 @@ function toggleEscludiModal() {
   const btn = document.getElementById('modal-escludi-btn');
   const isActive = btn.dataset.active === 'true';
   btn.dataset.active = isActive ? 'false' : 'true';
-  btn.style.background = isActive ? 'var(--card)' : 'var(--red-light)';
-  btn.style.borderColor = isActive ? 'var(--border)' : 'var(--red)';
-  btn.style.color = isActive ? '' : 'var(--red)';
+  btn.style.background = isActive ? '#fff' : 'var(--red-light)';
+  btn.style.borderColor = 'var(--red)';
+  btn.style.color = 'var(--red)';
   btn.textContent = isActive ? '🚫 Escludi' : '🔓 Includi';
 }
 
