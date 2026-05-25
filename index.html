@@ -825,7 +825,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
   .percorso-body { flex-direction: column; flex: 1; min-height: 0; overflow-y: scroll !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
-  .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible !important; display: block; border-right: none; border-bottom: 1px solid var(--border); }
+  .route-list-wrap { width: 100%; height: auto; max-height: none; flex-shrink: 0; overflow: visible !important; display: block; border-right: none; border-bottom: 1px solid var(--border); }
   .route-list { flex: none; height: auto !important; max-height: none !important; overflow: visible !important; padding-bottom: 20px; }
   .route-list::after { height: 0; min-height: 0; }
   #page-percorso { overflow: hidden !important; }
@@ -2757,6 +2757,29 @@ function renderDayList(dayIdx) {
   }
   
   showMapsPanel(dayIdx);
+  fixMobileScroll();
+}
+
+function fixMobileScroll() {
+  if (window.innerWidth > 767) return;
+  requestAnimationFrame(function() {
+    const page = document.getElementById('page-percorso');
+    if (!page) return;
+    const body = page.querySelector('.percorso-body');
+    const controls = page.querySelector('.percorso-controls');
+    const dayScroller = page.querySelector('.day-scroller');
+    if (!body || !controls || !dayScroller) return;
+    const pageH = page.offsetHeight;
+    const bodyH = pageH - controls.offsetHeight - dayScroller.offsetHeight;
+    if (bodyH < 100) return;
+    body.style.cssText = 'display:flex;flex-direction:column;overflow-y:scroll;overflow-x:hidden;-webkit-overflow-scrolling:touch;height:' + bodyH + 'px;flex:none;';
+    const wrap = body.querySelector('.route-list-wrap');
+    if (wrap) { wrap.style.flexShrink = '0'; wrap.style.overflow = 'visible'; wrap.style.height = 'auto'; }
+    const list = body.querySelector('.route-list');
+    if (list) { list.style.height = 'auto'; list.style.maxHeight = 'none'; list.style.overflow = 'visible'; list.style.flex = 'none'; }
+    const mapWrap = body.querySelector('.map-wrap');
+    if (mapWrap) { mapWrap.style.flex = 'none'; mapWrap.style.flexShrink = '0'; mapWrap.style.minHeight = '220px'; mapWrap.style.overflow = 'visible'; }
+  });
 }
 
 function quickEsito(e, id, esito) {
@@ -2868,6 +2891,17 @@ function ripristinaFarmacia(id) {
   saveEscluse();
   showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
+// Generatore pseudo-casuale con seed (LCG) — sostituisce shuffle rotto
+function seededRand(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return function() {
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = (s ^ (s >>> 16)) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
 function ricalcolaGiorno(dayIdx) {
   // Prendi GPS reale del dispositivo, poi calcola
   if (navigator.geolocation) {
@@ -2881,12 +2915,19 @@ function ricalcolaGiorno(dayIdx) {
   }
 }
 
+const _ricalcolaCounter = {};
+
 function _eseguiRicalcola(dayIdx, deviceGPS) {
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
   const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
+
+  // Contatore ciclo: ogni pressione dà opzioni diverse, cicla su 5
+  _ricalcolaCounter[dayIdx] = ((_ricalcolaCounter[dayIdx] || 0) % 5) + 1;
+  const cycleOffset = _ricalcolaCounter[dayIdx] * 10000;
+  const baseSeed = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + cycleOffset;
 
   // Appuntamenti fissi del giorno
   const pinned = FARMACIE.filter(f => {
@@ -2954,9 +2995,10 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     // Parte sempre dalla posizione GPS reale — coerenza geografica garantita
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + seedOffset;
+    const s = baseSeed + seedOffset;
+    const rand = seededRand(s);
     for (let i = rem.length - 1; i > 0; i--) {
-      const j = Math.floor((s * (i + 1)) % (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
     }
     if (strategy === 'priorita') rem.sort((a,b) => pri(a)-pri(b));
@@ -3000,9 +3042,10 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     const result = [...pinned];
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + seedOffset;
+    const s = baseSeed + seedOffset;
+    const rand = seededRand(s);
     for (let i = rem.length - 1; i > 0; i--) {
-      const j = Math.floor((s * (i + 1)) % (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
     }
     // Solo distanza, nessuna priorità
