@@ -2730,6 +2730,11 @@ function renderDayList(dayIdx) {
     list.appendChild(item);
   });
 
+  // Spacer reale per Android Chrome — il padding-bottom nei flex container viene ignorato
+  const scrollSpacer = document.createElement('div');
+  scrollSpacer.style.cssText = 'height:120px;min-height:120px;flex-shrink:0;width:100%;';
+  list.appendChild(scrollSpacer);
+
   document.getElementById('map-toolbar-info').innerHTML = `📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate`;
   
   // Progress bar giornaliera
