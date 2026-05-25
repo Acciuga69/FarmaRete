@@ -824,12 +824,12 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     background: none;
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
-  .percorso-body { flex-direction: column; flex: none; overflow: visible; }
-  .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible; display: block; border-right: none; border-bottom: 1px solid var(--border); }
-  .route-list { flex: none; height: calc(100svh - 310px); max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 0; }
-  .route-list::after { height: 120px; min-height: 120px; }
-  #page-percorso { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
-  .map-wrap { min-height: 35svh; flex-shrink: 0; }
+  .percorso-body { flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+  .route-list-wrap { width: 100%; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border-right: none; border-bottom: 1px solid var(--border); }
+  .route-list { flex: 1; min-height: 0; height: auto; max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 80px; }
+  .route-list::after { height: 0; min-height: 0; }
+  #page-percorso { overflow: hidden !important; }
+  .map-wrap { height: 35svh; min-height: 180px; flex-shrink: 0; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
 }
@@ -998,7 +998,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 
 /* Escludi button states */
 #modal-escludi-btn { border: 1.5px solid var(--red) !important; background: #fff !important; color: var(--red) !important; }
-#modal-escludi-btn.is-esclusa { background: var(--red-light) !important; color: #991b1b !important; }
+#modal-escludi-btn.is-esclusa { background: var(--red) !important; color: #fff !important; }
 .freq-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 5px; border-radius:5px; margin-left:4px; }
 .freq-top { background:var(--amber-light); color:var(--amber); }
 .freq-normal { background:var(--blue-light); color:var(--blue); }
@@ -2949,7 +2949,7 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     // Parte sempre dalla posizione GPS reale — coerenza geografica garantita
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Date.now() + seedOffset;
+    const s = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + seedOffset;
     for (let i = rem.length - 1; i > 0; i--) {
       const j = Math.floor((s * (i + 1)) % (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
@@ -2995,7 +2995,7 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     const result = [...pinned];
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Date.now() + seedOffset;
+    const s = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + seedOffset;
     for (let i = rem.length - 1; i > 0; i--) {
       const j = Math.floor((s * (i + 1)) % (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
