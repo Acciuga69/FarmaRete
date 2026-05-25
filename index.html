@@ -2757,6 +2757,30 @@ function renderDayList(dayIdx) {
   }
   
   showMapsPanel(dayIdx);
+
+  // Fix altezza lista su mobile — misura lo spazio reale disponibile
+  if (window.innerWidth <= 767) {
+    requestAnimationFrame(() => {
+      const page = document.getElementById('page-percorso');
+      const listEl = document.getElementById('route-list');
+      if (!page || !listEl) return;
+      const controls = page.querySelector('.percorso-controls');
+      const dayScr = page.querySelector('.day-scroller');
+      const listHdr = page.querySelector('.route-list-header');
+      const mapW = page.querySelector('.map-wrap');
+      const pageH = page.offsetHeight;
+      const usedH = (controls ? controls.offsetHeight : 0)
+                  + (dayScr ? dayScr.offsetHeight : 0)
+                  + (listHdr ? listHdr.offsetHeight : 0)
+                  + (mapW ? mapW.offsetHeight : 0);
+      const avail = pageH - usedH - 8;
+      if (avail > 80) {
+        listEl.style.flex = 'none';
+        listEl.style.height = avail + 'px';
+        listEl.style.overflowY = 'auto';
+      }
+    });
+  }
 }
 
 function quickEsito(e, id, esito) {
