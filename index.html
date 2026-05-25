@@ -824,11 +824,11 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     background: none;
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
-  .percorso-body { flex-direction: column; flex: none; overflow: visible !important; }
+  .percorso-body { flex-direction: column; flex: 1; min-height: 0; overflow-y: scroll !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
   .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible !important; display: block; border-right: none; border-bottom: 1px solid var(--border); }
-  .route-list { flex: none; height: auto !important; max-height: none !important; overflow-y: visible !important; overflow: visible !important; padding-bottom: 20px; }
+  .route-list { flex: none; height: auto !important; max-height: none !important; overflow: visible !important; padding-bottom: 20px; }
   .route-list::after { height: 0; min-height: 0; }
-  #page-percorso { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+  #page-percorso { overflow: hidden !important; }
   .map-wrap { flex: none !important; height: 40svh; min-height: 200px; overflow: visible; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
