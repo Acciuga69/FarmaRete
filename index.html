@@ -1952,7 +1952,10 @@ function giorniDaUltima(id) {
     if (appt > oggi) return -1; // valore speciale: appuntamento futuro
   }
   if (!fd.dataVisita) return Infinity;
-  return Math.floor((Date.now() - new Date(String(fd.dataVisita).slice(0,10) + "T12:00:00").getTime()) / 86400000);
+  let dvStr2 = String(fd.dataVisita).slice(0,10);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr2)) dvStr2 = dvStr2.slice(6)+'-'+dvStr2.slice(3,5)+'-'+dvStr2.slice(0,2);
+  const gg2 = Math.floor((Date.now() - new Date(dvStr2 + 'T12:00:00').getTime()) / 86400000);
+  return isNaN(gg2) ? Infinity : gg2;
 }
 
 function isAppuntamentoFuturo(id) {
@@ -2420,8 +2423,10 @@ function buildRoute() {
     if (fd.stato === 'richiamare') return false; // solo nella sezione Richiami
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
     if (fd.dataVisita) {
-      const dvStr = String(fd.dataVisita).slice(0, 10);
+      let dvStr = String(fd.dataVisita).slice(0, 10);
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr)) dvStr = dvStr.slice(6)+'-'+dvStr.slice(3,5)+'-'+dvStr.slice(0,2);
       const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
+      if (isNaN(gg)) return false; // data non parsabile → escludi per sicurezza
       const freq = fd.frequenza || frequenzaDefault(fd);
       // dataVisita è la verità: escludi sempre se recente, indipendentemente dallo stato
       if (fd.stato === 'assente') { if (gg < 3) return false; }
