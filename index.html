@@ -1019,6 +1019,23 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .filter-chip.fc-freddo.active { background:var(--blue-light); color:var(--blue); border-color:var(--blue); }
 .filter-chip.fc-visitata.active { background:var(--green-light); color:var(--green); border-color:var(--green); }
 .filter-chip.fc-richiamare.active { background:var(--amber-light); color:var(--amber); border-color:var(--amber); }
+/* ── STORICO ORDINI ── */
+.ordini-list { display:flex; flex-direction:column; gap:5px; max-height:160px; overflow-y:auto; margin-top:6px; }
+.ordine-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--surface); border-radius:8px; border:1px solid var(--border); font-size:0.78rem; }
+.ordine-tipo { padding:2px 8px; border-radius:12px; font-size:0.67rem; font-weight:700; flex-shrink:0; white-space:nowrap; }
+.ordine-tipo.visita { background:#e8f5e9; color:#2e7d32; }
+.ordine-tipo.telefonico { background:#e3f2fd; color:#1565c0; }
+.ordine-data { flex:1; color:var(--ink2); font-size:0.77rem; }
+.ordine-del { background:none; border:none; color:var(--red); cursor:pointer; padding:2px 6px; font-size:0.85rem; flex-shrink:0; line-height:1; }
+.ordine-add-row { display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap; }
+.ordine-add-row input, .ordine-add-row select { padding:6px 8px; border:1px solid var(--border); border-radius:8px; font-size:0.78rem; font-family:inherit; background:var(--surface); color:var(--ink); }
+.ordine-add-row input[type=date] { flex:1; min-width:120px; }
+.ordine-add-row select { flex:1; min-width:120px; }
+/* ── RICHIAMI NOTIFICHE ── */
+.richiamo-data-row { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+.richiamo-data-row input[type=date] { padding:4px 8px; border:1px solid var(--border); border-radius:6px; font-size:0.73rem; font-family:inherit; background:var(--surface); color:var(--ink); }
+.notif-btn { padding:5px 12px; border-radius:16px; border:1.5px solid var(--border); background:var(--card); font-size:0.73rem; font-weight:600; cursor:pointer; transition:all .2s; }
+.notif-btn.active { background:#1565c0; border-color:#1565c0; color:#fff; }
 </style>
 </head>
 <body>
@@ -1253,7 +1270,10 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   <div id="page-richiami" class="page scroll" style="padding:12px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
       <div class="section-title" style="margin-bottom:0;">🔁 Richiami in sospeso</div>
-      <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderRichiami()">🔄 Aggiorna</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="notif-toggle-btn" class="notif-btn" onclick="toggleNotifiche()">🔔 Notifiche</button>
+        <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderRichiami()">🔄 Aggiorna</button>
+      </div>
     </div>
     <div id="richiami-list"></div>
   </div>
@@ -1310,8 +1330,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <span style="font-size:0.75rem;color:var(--ink3);">Visita ogni 45 giorni</span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
-          <button id="modal-ordinato-btn" onclick="toggleOrdinatoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ha ordinato</button>
-          <button id="modal-ordine-btn" onclick="quickOrdineModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
+          <button id="modal-ordine-btn" onclick="aggiungiOrdineOggi()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
           <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--red);background:#fff;color:var(--red);font-size:0.78rem;font-weight:700;cursor:pointer;">🚫 Escludi</button>
         </div>
       </div>
@@ -1330,6 +1349,18 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <div>
         <div class="modal-section-label">Note visita</div>
         <textarea class="note-area" id="modal-notes" placeholder="Es: parla con la dott.ssa Rossi, interessata al prodotto X…"></textarea>
+      </div>
+      <div>
+        <div class="modal-section-label">📦 Storico ordini</div>
+        <div class="ordini-list" id="modal-ordini-list"></div>
+        <div class="ordine-add-row">
+          <input type="date" id="modal-ordine-nuova-data">
+          <select id="modal-ordine-tipo">
+            <option value="visita">📦 In visita</option>
+            <option value="telefonico">📞 Telefonico</option>
+          </select>
+          <button class="btn btn-ghost" onclick="aggiungiOrdineManuale()" style="font-size:0.73rem;padding:5px 12px;flex-shrink:0;">+ Aggiungi</button>
+        </div>
       </div>
       <div id="modal-last-visit" style="font-size:0.75rem;color:var(--ink3);"></div>
     </div>
@@ -1831,7 +1862,7 @@ function showPage(name, tab) {
   if (name !== 'farmacie') { searchQuery = ''; const i = document.getElementById('farmacie-search-input'); if(i) i.value=''; }
   if (name === 'farmacie') renderFarmacie();
   if (name === 'scadenze') renderScadenze();
-  if (name === 'richiami') renderRichiami();
+  if (name === 'richiami') { renderRichiami(); aggiornaNotifBtn(); }
 }
 
 // ══════════════════════════════════════════════
@@ -3422,12 +3453,13 @@ function quickEsitoScad(id, esito) {
 function renderRichiami() {
   const list = document.getElementById('richiami-list');
   const richiami = FARMACIE.filter(f => getFD(f.id).stato === 'richiamare');
-  if (!richiami.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔁</div><h4>Nessun richiamo</h4><p>Nessuna farmacia da richiamare.</p></div>'; return; }
+  if (!richiami.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔁</div><h4>Nessun richiamo</h4><p>Nessuna farmacia da richiamare.</p></div>'; aggiornaNotifBtn(); return; }
   const data = loadData();
-  // Ordina per data segnalazione (prima i più vecchi)
+  const oggi = toYMD(new Date());
+  // Ordina: scaduti prima, poi per data richiamo, poi per data visita
   richiami.sort((a,b) => {
-    const da = data[String(a.id)]?.dataVisita || '9999';
-    const db = data[String(b.id)]?.dataVisita || '9999';
+    const da = data[String(a.id)]?.dataRichiamo || data[String(a.id)]?.dataVisita || '9999';
+    const db = data[String(b.id)]?.dataRichiamo || data[String(b.id)]?.dataVisita || '9999';
     return da.localeCompare(db);
   });
   list.innerHTML = richiami.map(f => {
@@ -3436,7 +3468,13 @@ function renderRichiami() {
     const prioBadge = fd.isTop ? '<span style="font-size:0.62rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">⭐ TOP</span>'
       : fd.isCliente ? '<span style="font-size:0.62rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🤝 CLI</span>' : '';
     const attesaColor = gg > 14 ? 'var(--red)' : gg > 7 ? 'var(--amber)' : 'var(--ink3)';
-    return `<div class="scad-item" style="border-left:4px solid var(--amber);cursor:pointer;" onclick="openModal(${f.id})">
+    const dr = fd.dataRichiamo ? String(fd.dataRichiamo).slice(0,10) : '';
+    const drScaduto = dr && dr < oggi;
+    const drOggi = dr === oggi;
+    const drFuturo = dr && dr > oggi;
+    const drColor = drScaduto ? 'var(--red)' : drOggi ? 'var(--amber)' : 'var(--green)';
+    const drLabel = drScaduto ? '⚠️ Scaduto il '+formatDate(dr) : drOggi ? '⏰ Da chiamare OGGI!' : drFuturo ? '📆 '+formatDate(dr) : '';
+    return `<div class="scad-item" style="border-left:4px solid ${drScaduto?'var(--red)':drOggi?'var(--amber)':'var(--amber)'};cursor:pointer;" onclick="openModal(${f.id})">
       <div style="display:flex;align-items:flex-start;gap:8px;">
         <div style="flex:1;min-width:0;">
           <div class="scad-nome">${prioBadge}${fd.nomeCustom||f.n}</div>
@@ -3444,6 +3482,11 @@ function renderRichiami() {
           ${fd.note ? `<div style="font-size:0.72rem;color:var(--ink2);margin-top:4px;padding:5px 8px;background:var(--amber-light);border-radius:6px;">📝 ${fd.note}</div>` : ''}
           <div style="font-size:0.68rem;margin-top:4px;color:${attesaColor};font-weight:600;">
             🔁 Segnato ${gg !== null ? (gg===0?'oggi':gg===1?'ieri':gg+' giorni fa') : 'il '+formatDate(fd.dataVisita)}
+          </div>
+          <div class="richiamo-data-row" onclick="event.stopPropagation()">
+            <span style="font-size:0.71rem;color:var(--ink3);white-space:nowrap;">📅 Chiama il:</span>
+            <input type="date" value="${dr}" onchange="setDataRichiamo(${f.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.73rem;font-family:inherit;background:var(--surface);color:var(--ink);">
+            ${drLabel ? `<span style="font-size:0.68rem;font-weight:700;color:${drColor};white-space:nowrap;">${drLabel}</span>` : ''}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
@@ -3453,6 +3496,7 @@ function renderRichiami() {
       </div>
     </div>`;
   }).join('');
+  aggiornaNotifBtn();
 }
 
 function quickEsitoRich(id, esito) {
@@ -3656,6 +3700,7 @@ function openModal(id) {
   else lv.textContent = 'Mai visitata';
 
   document.getElementById('modal-overlay').classList.add('open');
+  loadOrdiniModal(id);
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalIfOutside(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
@@ -3737,6 +3782,13 @@ function saveModal() {
   } else if (stato && stato !== 'da-visitare') {
     update.dataVisita = new Date().toISOString().slice(0,10);
     update.dataAppuntamento = null;
+  }
+  // Salva storico ordini
+  update.ordini = [..._ordiniPending];
+  update.haOrdine = _ordiniPending.length > 0;
+  if (_ordiniPending.length > 0) {
+    const latest = [..._ordiniPending].sort((a,b) => b.data.localeCompare(a.data))[0];
+    update.dataOrdine = latest.data;
   }
   setFD(currentFarmaciaId, update);
   autoUploadAfterSave();
@@ -4217,4 +4269,133 @@ window.addEventListener('load', () => {
     setTimeout(() => showInstallBanner('ios'), 3000);
   }
 });
+// ══════════════════════════════════════════════
+// STORICO ORDINI
+// ══════════════════════════════════════════════
+let _ordiniPending = [];
+
+function loadOrdiniModal(id) {
+  const fd = getFD(String(id));
+  // Migrazione da vecchio formato
+  if (fd.ordini && Array.isArray(fd.ordini)) {
+    _ordiniPending = [...fd.ordini];
+  } else {
+    _ordiniPending = [];
+    if (fd.haOrdine && fd.dataOrdine) _ordiniPending.push({data: String(fd.dataOrdine).slice(0,10), tipo: 'visita'});
+    else if (fd.haOrdinato) _ordiniPending.push({data: fd.dataVisita ? String(fd.dataVisita).slice(0,10) : toYMD(new Date()), tipo: 'visita'});
+  }
+  // Default date = oggi
+  const inp = document.getElementById('modal-ordine-nuova-data');
+  if (inp) inp.value = toYMD(new Date());
+  renderOrdiniModal();
+}
+
+function renderOrdiniModal() {
+  const list = document.getElementById('modal-ordini-list');
+  if (!list) return;
+  if (!_ordiniPending.length) {
+    list.innerHTML = '<div style="font-size:0.72rem;color:var(--ink3);padding:4px 0;">Nessun ordine registrato</div>';
+    return;
+  }
+  const sorted = [..._ordiniPending].sort((a,b) => b.data.localeCompare(a.data));
+  list.innerHTML = sorted.map(o => `
+    <div class="ordine-item">
+      <span class="ordine-tipo ${o.tipo}">${o.tipo==='telefonico'?'📞 Tel':'📦 Vis'}</span>
+      <span class="ordine-data">${formatDate(o.data)}</span>
+      <button class="ordine-del" onclick="rimuoviOrdinePending('${o.data}','${o.tipo}')">✕</button>
+    </div>`).join('');
+  // Aggiorna aspetto tasto Ordine oggi
+  const btn = document.getElementById('modal-ordine-btn');
+  if (btn) { btn.style.background = _ordiniPending.some(o=>o.data===toYMD(new Date())) ? '#e8f5e9' : ''; btn.style.color = _ordiniPending.some(o=>o.data===toYMD(new Date())) ? '#2e7d32' : ''; }
+}
+
+function aggiungiOrdineOggi() {
+  const today = toYMD(new Date());
+  if (!_ordiniPending.some(o=>o.data===today && o.tipo==='visita')) {
+    _ordiniPending.push({data: today, tipo: 'visita'});
+    renderOrdiniModal();
+    showToast('📦 Ordine di oggi aggiunto', 'ok');
+  } else {
+    showToast('📦 Ordine di oggi già presente', 'info');
+  }
+}
+
+function aggiungiOrdineManuale() {
+  const data = document.getElementById('modal-ordine-nuova-data')?.value;
+  const tipo = document.getElementById('modal-ordine-tipo')?.value || 'visita';
+  if (!data) { showToast('Inserisci una data', 'warn'); return; }
+  _ordiniPending.push({data, tipo});
+  renderOrdiniModal();
+  document.getElementById('modal-ordine-nuova-data').value = toYMD(new Date());
+}
+
+function rimuoviOrdinePending(data, tipo) {
+  const idx = _ordiniPending.findIndex(o => o.data===data && o.tipo===tipo);
+  if (idx >= 0) { _ordiniPending.splice(idx, 1); renderOrdiniModal(); }
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICHE RICHIAMI
+// ══════════════════════════════════════════════
+function toggleNotifiche() {
+  const attive = localStorage.getItem('farmarete_notifiche') === 'true';
+  if (!attive) {
+    if (!('Notification' in window)) { showToast('Browser non supporta notifiche', 'warn'); return; }
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') {
+        localStorage.setItem('farmarete_notifiche', 'true');
+        showToast('🔔 Notifiche attivate!', 'ok');
+        aggiornaNotifBtn();
+        checkNotificheRichiami();
+      } else {
+        showToast('Permesso negato. Abilitalo dalle impostazioni del browser.', 'warn');
+      }
+    });
+  } else {
+    localStorage.setItem('farmarete_notifiche', 'false');
+    showToast('🔕 Notifiche disattivate', 'info');
+    aggiornaNotifBtn();
+  }
+}
+
+function aggiornaNotifBtn() {
+  const btn = document.getElementById('notif-toggle-btn');
+  if (!btn) return;
+  const attive = localStorage.getItem('farmarete_notifiche') === 'true';
+  btn.classList.toggle('active', attive);
+  btn.textContent = attive ? '🔔 Notifiche ON' : '🔕 Notifiche OFF';
+}
+
+function checkNotificheRichiami() {
+  if (localStorage.getItem('farmarete_notifiche') !== 'true') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const oggi = toYMD(new Date());
+  const domani = toYMD(new Date(Date.now() + 86400000));
+  const data = loadData();
+  FARMACIE.forEach(f => {
+    const fd = data[String(f.id)] || {};
+    if (fd.stato !== 'richiamare' || !fd.dataRichiamo) return;
+    const dr = String(fd.dataRichiamo).slice(0,10);
+    if (dr === oggi || dr === domani) {
+      const quando = dr === oggi ? 'OGGI' : 'domani';
+      try {
+        new Notification(`🔁 Richiamo ${quando}: ${fd.nomeCustom||f.n}`, {
+          body: `📍 ${f.loc}${fd.note ? ' · '+fd.note.slice(0,60) : ''}`,
+          icon: '/FarmaRete/icon-192.png',
+          tag: 'richiamo-'+f.id
+        });
+      } catch(e) {}
+    }
+  });
+}
+
+function setDataRichiamo(id, val) {
+  setFD(String(id), {dataRichiamo: val || null});
+  updateBadges();
+}
+
+// Controlla notifiche all'apertura dell'app e quando la pagina torna in primo piano
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNotificheRichiami(); });
+setTimeout(checkNotificheRichiami, 2000);
+
 </script></body></html>
