@@ -1311,9 +1311,13 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div class="modal-section-label">Stato visita</div>
         <div class="stato-chips">
           <div class="stato-chip" data-stato="visitata" onclick="setStato('visitata')">✅ Visitata</div>
-          <div class="stato-chip" data-stato="richiamare" onclick="setStato('richiamare')">🔁 Richiamare</div>
+          <div class="stato-chip" data-stato="richiamare" onclick="setStatoRichiamare()">🔁 Richiamare</div>
           <div class="stato-chip" data-stato="assente" onclick="setStato('assente')">🔴 Assente</div>
           <div class="stato-chip" data-stato="da-visitare" onclick="setStato('da-visitare')">⏳ Da visitare</div>
+        </div>
+        <div id="modal-richiamo-data-row" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.76rem;color:var(--amber);font-weight:700;">📅 Chiama il:</span>
+          <input type="date" id="modal-richiamo-data" style="padding:6px 10px;border:1.5px solid var(--amber);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--ink);">
         </div>
       </div>
       <div>
@@ -3693,6 +3697,16 @@ function openModal(id) {
 
   document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato === fd.stato));
   document.querySelectorAll('.prio-chip').forEach(c => c.classList.toggle('active', c.dataset.prio === fd.priorita));
+  // Mostra campo data richiamo se stato = richiamare
+  const richRow = document.getElementById('modal-richiamo-data-row');
+  const richInput = document.getElementById('modal-richiamo-data');
+  if (fd.stato === 'richiamare') {
+    richRow.style.display = 'flex';
+    richInput.value = fd.dataRichiamo ? String(fd.dataRichiamo).slice(0,10) : '';
+  } else {
+    richRow.style.display = 'none';
+    richInput.value = '';
+  }
 
   const gg = giorniDaUltima(id);
   const lv = document.getElementById('modal-last-visit');
@@ -3704,7 +3718,18 @@ function openModal(id) {
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalIfOutside(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
-function setStato(stato) { document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato===stato)); }
+function setStato(stato) {
+  document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato===stato));
+  const row = document.getElementById('modal-richiamo-data-row');
+  if (row) row.style.display = 'none';
+}
+function setStatoRichiamare() {
+  document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato==='richiamare'));
+  const row = document.getElementById('modal-richiamo-data-row');
+  if (row) row.style.display = 'flex';
+  const inp = document.getElementById('modal-richiamo-data');
+  if (inp && !inp.value) inp.value = toYMD(new Date(Date.now() + 86400000));
+}
 function setPrio(prio) { document.querySelectorAll('.prio-chip').forEach(c => c.classList.toggle('active', c.dataset.prio===prio)); }
 function toggleClienteModal() {
   const btn = document.getElementById('modal-cliente-btn');
@@ -3782,6 +3807,13 @@ function saveModal() {
   } else if (stato && stato !== 'da-visitare') {
     update.dataVisita = new Date().toISOString().slice(0,10);
     update.dataAppuntamento = null;
+  }
+  // Salva data richiamo se stato = richiamare
+  const richInput = document.getElementById('modal-richiamo-data');
+  if (stato === 'richiamare' && richInput?.value) {
+    update.dataRichiamo = richInput.value;
+  } else if (stato && stato !== 'richiamare') {
+    update.dataRichiamo = null;
   }
   // Salva storico ordini
   update.ordini = [..._ordiniPending];
