@@ -1845,6 +1845,33 @@ let routeWeekOffset = 0;
 let currentPercorsoIdx = 0;
 let currentRoute = [];
 let selectedDay = 0;
+
+function saveRoute() {
+  try {
+    localStorage.setItem('farmarete_route', JSON.stringify({
+      days: currentRoute.map(day => day.map(f => f.id)),
+      dates: routeDates.map(d => d instanceof Date ? d.toISOString() : d),
+      selectedDay,
+      weekOffset: routeWeekOffset
+    }));
+  } catch(e) {}
+}
+
+function loadSavedRoute() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('farmarete_route') || 'null');
+    if (!saved || !saved.days || !saved.days.length) return false;
+    const farmMap = {};
+    FARMACIE.forEach(f => { farmMap[String(f.id)] = f; });
+    currentRoute = saved.days.map(day => day.map(id => farmMap[String(id)]).filter(Boolean));
+    routeDates = (saved.dates || []).map(d => new Date(d));
+    selectedDay = saved.selectedDay || 0;
+    routeWeekOffset = saved.weekOffset || 0;
+    const label = document.getElementById('week-label');
+    if (label) label.textContent = routeWeekOffset === 0 ? 'Sett. corrente' : `+${routeWeekOffset} sett.`;
+    return currentRoute.some(d => d.length > 0);
+  } catch(e) { return false; }
+}
 let currentFilter = 'all';
 let currentFarmaciaId = null;
 let searchQuery = '';
@@ -2450,16 +2477,21 @@ function buildRoute() {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return false; // solo nella sezione Richiami
+    if (fd.stato === 'richiamare') return false;
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-    if (fd.dataVisita) {
-      let dvStr = String(fd.dataVisita).slice(0, 10);
+    // Usa la data più recente tra visita e appuntamento passato come riferimento
+    const dateRef = [fd.dataVisita, fd.dataAppuntamento]
+      .filter(Boolean)
+      .map(d => String(d).slice(0,10))
+      .filter(d => d <= todayYMD)
+      .sort().pop();
+    if (dateRef) {
+      let dvStr = dateRef;
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr)) dvStr = dvStr.slice(6)+'-'+dvStr.slice(3,5)+'-'+dvStr.slice(0,2);
       const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
-      if (isNaN(gg)) return false; // data non parsabile → escludi per sicurezza
+      if (isNaN(gg)) return false;
       const freq = fd.frequenza || frequenzaDefault(fd);
-      // dataVisita è la verità: escludi sempre se recente, indipendentemente dallo stato
-      if (fd.stato === 'assente') { if (gg < 3) return false; }
+      if (fd.stato === 'assente') { if (gg < 14) return false; }
       else { if (gg < freq) return false; }
     }
     return true;
@@ -2690,6 +2722,7 @@ function renderDayTabs() {
     };
     scroller.appendChild(btn);
   });
+  saveRoute();
 }
 
 function renderDayList(dayIdx) {
@@ -2991,11 +3024,15 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
       const fd = _getFD(f.id);
       if (fd.stato === 'richiamare') return false;
       if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-      if (fd.dataVisita) {
-        const dvStr = String(fd.dataVisita).slice(0, 10);
+      const dateRef2 = [fd.dataVisita, fd.dataAppuntamento]
+        .filter(Boolean).map(d => String(d).slice(0,10)).filter(d => d <= todayYMD).sort().pop();
+      if (dateRef2) {
+        let dvStr = dateRef2;
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr)) dvStr = dvStr.slice(6)+'-'+dvStr.slice(3,5)+'-'+dvStr.slice(0,2);
         const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
+        if (isNaN(gg)) return false;
         const freq = fd.frequenza || frequenzaDefault(fd);
-        if (fd.stato === 'assente') { if (gg < 3) return false; }
+        if (fd.stato === 'assente') { if (gg < 14) return false; }
         else { if (gg < freq) return false; }
       }
       return true;
@@ -3125,6 +3162,7 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     card.querySelector('button').onclick = () => {
       allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = alt.day; });
       currentRoute[dayIdx] = alt.day;
+      saveRoute();
       document.getElementById('ricalcola-overlay').classList.remove('open');
       renderDayTabs();
       renderDayList(dayIdx);
@@ -4270,7 +4308,10 @@ window.addEventListener('load', () => {
   loadEscluse();
   document.getElementById('prov-filter').value = 'ALL';
   refreshDashboard();
-  buildRoute();
+  // Carica il percorso salvato — NON rigenerare automaticamente
+  if (loadSavedRoute()) {
+    renderDayList(selectedDay);
+  }
   renderFarmacie();
   renderScadenze();
   renderRichiami();
