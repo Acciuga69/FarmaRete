@@ -4310,11 +4310,13 @@ window.addEventListener('load', () => {
   refreshDashboard();
   // Carica il percorso salvato — NON rigenerare automaticamente
   if (loadSavedRoute()) {
+    renderDayTabs();
     renderDayList(selectedDay);
   }
   renderFarmacie();
   renderScadenze();
   renderRichiami();
+  aggiornaNotifBtn(); // Ripristina stato notifiche salvato
   generatePWAIcon();
 
   // SERVICE WORKER
