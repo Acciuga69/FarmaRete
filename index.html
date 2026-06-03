@@ -2028,14 +2028,9 @@ function calcolaFrequenzaAdattiva() {
 }
 
 function frequenzaDefault(fd) {
-  // Default per tipo: Top=30gg, Cliente=45gg, Potenziale=90gg
-  if (fd.isTop) return 30;
-  if (fd.isCliente || fd.stato === 'da-visitare') return 45;
-  if (fd.priorita === 'caldo') return 60;
-  if (fd.priorita === 'tiepido') return 90;
-  if (fd.priorita === 'freddo') return 120;
-  if (fd.stato === 'potenziale') return 90;
-  return 45; // default generico
+  if (fd.isTop) return 45;          // top client: ogni 45 giorni
+  if (fd.priorita === 'caldo') return 60;  // interesse attivo: ogni 60 giorni
+  return 90;                         // tutto il resto: 90 giorni default
 }
 
 function frequenza(id) {
@@ -3626,7 +3621,7 @@ function openModal(id) {
   document.getElementById('modal-nome').value = nomeCustom;
   document.getElementById('modal-subtitle').textContent = `📍 ${f.a} · ${f.loc} (${f.c})`;
   document.getElementById('modal-notes').value = fd.note || '';
-  document.getElementById('modal-freq').value = fd.frequenza || (fd.isTop?45:90);
+  document.getElementById('modal-freq').value = fd.frequenza || (fd.isTop ? 45 : fd.priorita === 'caldo' ? 60 : 90);
   // Data visita / appuntamento
   const dataInput = document.getElementById('modal-data-visita');
   const hint = document.getElementById('modal-data-hint');
@@ -3818,6 +3813,7 @@ function saveModal() {
   // Salva storico ordini
   update.ordini = [..._ordiniPending];
   update.haOrdine = _ordiniPending.length > 0;
+  update.haOrdinato = _ordiniPending.length > 0; // usato dal routing per priorità
   if (_ordiniPending.length > 0) {
     const latest = [..._ordiniPending].sort((a,b) => b.data.localeCompare(a.data))[0];
     update.dataOrdine = latest.data;
