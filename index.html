@@ -2705,11 +2705,15 @@ function renderDayTabs() {
   const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
   const mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   const todayStr = toYMD(new Date());
+  let firstVisibleIdx = -1;
   currentRoute.forEach((day, i) => {
-    const btn = document.createElement('button');
     const d = routeDates[i];
-    const isToday = d && toYMD(d) === todayStr;
-    btn.className = 'day-btn' + (i===0?' active':'');
+    const dayStr = d ? toYMD(d) : null;
+    if (dayStr && dayStr < todayStr) return; // nascondi giorni passati
+    if (firstVisibleIdx === -1) firstVisibleIdx = i;
+    const btn = document.createElement('button');
+    const isToday = dayStr === todayStr;
+    btn.className = 'day-btn' + (i === selectedDay ? ' active' : '') + (isToday ? ' oggi' : '');
     const label = d
       ? `${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
       : `Giorno ${i+1} (${day.length})`;
@@ -2719,10 +2723,14 @@ function renderDayTabs() {
       btn.classList.add('active');
       renderDayList(i);
       selectedDay = i;
+      saveRoute();
     };
     scroller.appendChild(btn);
   });
-  saveRoute();
+  // Se selectedDay è nel passato, vai al primo giorno visibile
+  if (firstVisibleIdx >= 0 && routeDates[selectedDay] && toYMD(routeDates[selectedDay]) < todayStr) {
+    selectedDay = firstVisibleIdx;
+  }
 }
 
 function renderDayList(dayIdx) {
@@ -2855,13 +2863,18 @@ function quickEsito(e, id, esito) {
   id = String(id);
   const fd = getFD(id);
   if (fd.stato === esito) {
+    // Deseleziona: ripristina farmacia nel giorno corrente
     setFD(id, {stato:'', dataVisita:null, dataAppuntamento:null});
     localStorage.removeItem('farmarete_last_visit');
+    const day = currentRoute[selectedDay] || [];
+    if (!day.find(f => String(f.id) === id)) {
+      const farm = FARMACIE.find(f => String(f.id) === id);
+      if (farm) currentRoute[selectedDay] = [...day, farm];
+    }
   } else {
     const update = {stato:esito, dataVisita:toYMD(new Date())};
     if (esito === 'visitata') {
       update.dataAppuntamento = null;
-      // Apprendimento adattivo: calcola durata visita precedente
       try {
         const last = JSON.parse(localStorage.getItem('farmarete_last_visit') || 'null');
         const now = Date.now();
@@ -2879,11 +2892,49 @@ function quickEsito(e, id, esito) {
       } catch(e) {}
     }
     setFD(id, update);
+    // Rimuovi dal giorno corrente
+    if (currentRoute[selectedDay]) {
+      currentRoute[selectedDay] = currentRoute[selectedDay].filter(f => String(f.id) !== id);
+    }
+    // Se assente: reinserisci nel giorno futuro geograficamente più vicino
+    if (esito === 'assente') {
+      reinserisciAssente(id);
+    }
   }
+  saveRoute();
+  renderDayTabs();
   renderDayList(selectedDay);
   updateBadges();
   autoUploadAfterSave();
   haptic(esito === 'visitata' ? 'success' : 'light');
+}
+
+function reinserisciAssente(id) {
+  const farm = FARMACIE.find(f => String(f.id) === id);
+  if (!farm) return;
+  let bestDay = -1, bestPos = 0, bestScore = Infinity;
+  // Cerca nei prossimi 3 giorni del percorso
+  for (let d = selectedDay + 1; d < Math.min(currentRoute.length, selectedDay + 4); d++) {
+    const day = currentRoute[d];
+    if (!day || !day.length) continue;
+    if (day.find(f => String(f.id) === id)) continue; // già presente
+    for (let pos = 0; pos <= day.length; pos++) {
+      const prev = pos > 0 ? day[pos-1] : null;
+      const next = pos < day.length ? day[pos] : null;
+      const score = (prev ? travelMinutes(prev.loc, farm.loc) : 0)
+                  + (next ? travelMinutes(farm.loc, next.loc) : 0);
+      if (score < bestScore) { bestScore = score; bestDay = d; bestPos = pos; }
+    }
+    if (bestDay === d) break; // Preferisci il giorno più vicino se il fit è buono
+  }
+  if (bestDay >= 0) {
+    currentRoute[bestDay] = [
+      ...currentRoute[bestDay].slice(0, bestPos),
+      farm,
+      ...currentRoute[bestDay].slice(bestPos)
+    ];
+    showToast(`🔴 Assente — reinserita nel giorno ${bestDay - selectedDay === 1 ? 'dopo' : 'seguente'}`, 'info');
+  }
 }
 
 function quickOrdine(e, id) {
