@@ -851,8 +851,26 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
 /* ── TAP FEEDBACK ── */
-.tap-flash { animation: tapFlash .35s ease; }
-@keyframes tapFlash { 0% { filter: brightness(1); } 40% { filter: brightness(1.5); } 100% { filter: brightness(1); } }
+.tap-flash { animation: tapFlash .25s ease; }
+@keyframes tapFlash { 0% { filter: brightness(1); } 35% { filter: brightness(1.6); } 100% { filter: brightness(1); } }
+
+/* Elimina 300ms delay su tutti i tap + feedback :active istantaneo */
+button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip,
+.day-btn, .btn-esito, .maps-btn, .route-card, .scad-item,
+.btn-riammetti, .pa-tab, .ordine-del, .notif-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: transform .08s, opacity .08s; }
+.nav-tab:active { opacity: 0.65; transform: scale(0.92); }
+.filter-chip:active, .stato-chip:active, .prio-chip:active { transform: scale(0.90); opacity: 0.75; }
+.day-btn:active { transform: scale(0.92); }
+.btn-esito:active { transform: scale(0.91); opacity: 0.8; }
+.route-card:active { transform: scale(0.98); opacity: 0.9; }
+.scad-item:active { opacity: 0.8; }
+.maps-btn:active { transform: scale(0.93); }
 
 
 /* ── CHART ── */
@@ -2567,9 +2585,39 @@ function buildRoute() {
         currentLoc = chosen.loc;
       }
 
-      days.push(dayRoute);
+      days.push(sortGeoDay(dayRoute, startPoint.label, _getFD));
     }
     return days;
+  }
+
+  // Riordina geograficamente un giorno — nearest-neighbor dal punto di partenza
+  // Le farmacie con appuntamento pomeridiano restano in fondo
+  function sortGeoDay(pharmacies, startLoc, getFDfn) {
+    if (pharmacies.length <= 1) return pharmacies;
+    // Separa farmacie con appuntamento tardo (>= 13:00) dalle altre
+    const tardy = pharmacies.filter(f => {
+      const ora = getFDfn(f.id).oraAppuntamento || '';
+      return ora >= '13:00';
+    });
+    const free = pharmacies.filter(f => {
+      const ora = getFDfn(f.id).oraAppuntamento || '';
+      return !ora || ora < '13:00';
+    });
+    // Riordina la parte "libera" con nearest-neighbor
+    const sortNN = (list, loc) => {
+      const rem = [...list]; const sorted = [];
+      let cur = loc;
+      while (rem.length > 0) {
+        const best = rem.map((f,i) => ({f,i,t:travelMinutes(cur,f.loc)})).sort((a,b)=>a.t-b.t)[0];
+        sorted.push(best.f); cur = best.f.loc; rem.splice(best.i,1);
+      }
+      return sorted;
+    };
+    const sortedFree = sortNN(free, startLoc);
+    const lastFreeLoc = sortedFree.length > 0 ? sortedFree[sortedFree.length-1].loc : startLoc;
+    // Appuntamenti tardi in ordine geografico dalla fine delle visite libere
+    const sortedTardy = sortNN(tardy, lastFreeLoc);
+    return [...sortedFree, ...sortedTardy];
   }
 
   // Tre varianti con logica distinta + seed settimanale per varietà tra settimane
@@ -4375,15 +4423,15 @@ window.addEventListener('load', () => {
     navigator.serviceWorker.register('/FarmaRete/sw.js').catch(() => {});
   }
 
-  // TAP FEEDBACK su tutti i bottoni
-  document.addEventListener('click', e => {
-    const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-pill, .btn-esito, .pa-tab, .maps-btn, .btn-riammetti');
+  // TAP FEEDBACK istantaneo — touchstart invece di click elimina il 300ms delay
+  document.addEventListener('touchstart', e => {
+    const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-btn, .btn-esito, .maps-btn, .btn-riammetti');
     if (!btn) return;
     btn.classList.remove('tap-flash');
     void btn.offsetWidth;
     btn.classList.add('tap-flash');
     btn.addEventListener('animationend', () => btn.classList.remove('tap-flash'), { once: true });
-  });
+  }, { passive: true });
 
   // iOS install hint (after 3s, only once)
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
