@@ -2780,6 +2780,7 @@ function renderDayList(dayIdx) {
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
           <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia', true)" style="background:#546e7a;color:#fff;font-weight:700;">🗺 Anteprima</button>
+          ${f.tipo==='parafarmacia' ? `<button class="btn-esito" onclick="event.stopPropagation();quickEscludiPF(${f.id})" style="background:#7c3aed;color:#fff;font-weight:700;">🚫 Escludi PF</button>` : ''}
         </div>
       </div>
       <div class="route-badge ${f.tipo==='parafarmacia'?'badge-pf':f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':'badge-so'}">${f.tipo==='parafarmacia'?'PF':f.p}</div>
@@ -2809,6 +2810,28 @@ function renderDayList(dayIdx) {
   }
   
   showMapsPanel(dayIdx);
+}
+
+function quickEscludiPF(id) {
+  id = String(id);
+  loadEscluse();
+  if (escluseIds.has(id)) {
+    escluseIds.delete(id);
+    delete escluseData[id];
+    showToast('✅ Parafarmacia reintrodotta nel giro', 'ok');
+  } else {
+    escluseIds.add(id);
+    escluseData[id] = { data: toYMD(new Date()) };
+    if (currentRoute[selectedDay]) {
+      currentRoute[selectedDay] = currentRoute[selectedDay].filter(f => String(f.id) !== id);
+    }
+    showToast('🚫 Parafarmacia esclusa dal giro', 'info');
+  }
+  saveEscluse();
+  saveRoute();
+  renderDayTabs();
+  renderDayList(selectedDay);
+  updateBadges();
 }
 
 function quickEsito(e, id, esito) {
