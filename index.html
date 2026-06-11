@@ -399,6 +399,7 @@ input[type=number] { width: 62px; }
 }
 .route-list-header span { font-size: 0.75rem; color: var(--ink3); font-weight: 600; }
 .route-list { flex: 1; overflow-y: auto; padding: 8px 8px 80px 8px; display: flex; flex-direction: column; gap: 6px; }
+.route-list::after { content: ''; display: block; height: 80px; min-height: 80px; flex-shrink: 0; }
 
 .route-card {
   background: var(--card);
@@ -441,13 +442,12 @@ input[type=number] { width: 62px; }
 .tag-MB { background: var(--blue-light); color: var(--blue); }
 .tag-LC { background: var(--amber-light); color: var(--amber); }
 .tag-SO { background: var(--red-light); color: var(--red); }
-.tag-DRMAX { background: var(--purple-light); color: var(--purple); }
-/* Badge provincia su route card e farmacia card */
 .route-badge, .farmacia-badge { position:absolute; top:8px; right:8px; font-size:0.6rem; font-weight:800; padding:2px 6px; border-radius:6px; letter-spacing:.4px; }
 .badge-mb { background:var(--blue); color:#fff; }
 .badge-lc { background:var(--amber); color:#fff; }
 .badge-so { background:var(--red); color:#fff; }
-.badge-pf { background:#7c3aed; color:#fff; } /* Parafarmacia — viola */
+.badge-pf { background:#7c3aed; color:#fff; }
+.tag-DRMAX { background: var(--purple-light); color: var(--purple); }
 .tag-visitata { background: var(--green-light); color: var(--green); }
 .tag-richiamare { background: var(--amber-light); color: var(--amber); }
 .tag-caldo { background: var(--red-light); color: var(--red); }
@@ -829,11 +829,12 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
     background: none;
   }
   select, input[type=number], input[type=text], textarea, input[type=date] { font-size: 16px !important; }
-  .percorso-body { flex-direction: column; flex: none; overflow: visible; }
-  .route-list-wrap { width: 100%; height: auto; max-height: none; overflow: visible; display: block; border-right: none; border-bottom: 1px solid var(--border); }
-  .route-list { flex: none; height: calc(100svh - 310px); max-height: none; overflow-y: auto !important; -webkit-overflow-scrolling: touch; padding-bottom: 120px; }
-  #page-percorso { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
-  .map-wrap { min-height: 35svh; flex-shrink: 0; }
+  .percorso-body { flex-direction: column; flex: 1; min-height: 0; overflow-y: scroll !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .route-list-wrap { width: 100%; height: auto; max-height: none; flex-shrink: 0; overflow: visible !important; display: block; border-right: none; border-bottom: 1px solid var(--border); }
+  .route-list { flex: none; height: auto !important; max-height: none !important; overflow: visible !important; padding-bottom: 20px; }
+  .route-list::after { height: 0; min-height: 0; }
+  #page-percorso { overflow: hidden !important; }
+  .map-wrap { flex: none !important; height: 40svh; min-height: 200px; overflow: visible; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding-left: calc(16px + var(--safe-left)); padding-right: calc(16px + var(--safe-right)); }
 }
@@ -855,8 +856,26 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
 /* ── TAP FEEDBACK ── */
-.tap-flash { animation: tapFlash .35s ease; }
-@keyframes tapFlash { 0% { filter: brightness(1); } 40% { filter: brightness(1.5); } 100% { filter: brightness(1); } }
+.tap-flash { animation: tapFlash .25s ease; }
+@keyframes tapFlash { 0% { filter: brightness(1); } 35% { filter: brightness(1.6); } 100% { filter: brightness(1); } }
+
+/* Elimina 300ms delay su tutti i tap + feedback :active istantaneo */
+button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip,
+.day-btn, .btn-esito, .maps-btn, .route-card, .scad-item,
+.btn-riammetti, .pa-tab, .ordine-del, .notif-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: transform .08s, opacity .08s; }
+.nav-tab:active { opacity: 0.65; transform: scale(0.92); }
+.filter-chip:active, .stato-chip:active, .prio-chip:active { transform: scale(0.90); opacity: 0.75; }
+.day-btn:active { transform: scale(0.92); }
+.btn-esito:active { transform: scale(0.91); opacity: 0.8; }
+.route-card:active { transform: scale(0.98); opacity: 0.9; }
+.scad-item:active { opacity: 0.8; }
+.maps-btn:active { transform: scale(0.93); }
 
 
 /* ── CHART ── */
@@ -1002,7 +1021,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 
 /* Escludi button states */
 #modal-escludi-btn { border: 1.5px solid var(--red) !important; background: #fff !important; color: var(--red) !important; }
-#modal-escludi-btn.is-esclusa { background: var(--red-light) !important; color: #991b1b !important; }
+#modal-escludi-btn.is-esclusa { background: var(--red) !important; color: #fff !important; }
 .freq-badge { display:inline-block; font-size:0.62rem; font-weight:700; padding:1px 5px; border-radius:5px; margin-left:4px; }
 .freq-top { background:var(--amber-light); color:var(--amber); }
 .freq-normal { background:var(--blue-light); color:var(--blue); }
@@ -1023,6 +1042,23 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
 .filter-chip.fc-freddo.active { background:var(--blue-light); color:var(--blue); border-color:var(--blue); }
 .filter-chip.fc-visitata.active { background:var(--green-light); color:var(--green); border-color:var(--green); }
 .filter-chip.fc-richiamare.active { background:var(--amber-light); color:var(--amber); border-color:var(--amber); }
+/* ── STORICO ORDINI ── */
+.ordini-list { display:flex; flex-direction:column; gap:5px; max-height:160px; overflow-y:auto; margin-top:6px; }
+.ordine-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--surface); border-radius:8px; border:1px solid var(--border); font-size:0.78rem; }
+.ordine-tipo { padding:2px 8px; border-radius:12px; font-size:0.67rem; font-weight:700; flex-shrink:0; white-space:nowrap; }
+.ordine-tipo.visita { background:#e8f5e9; color:#2e7d32; }
+.ordine-tipo.telefonico { background:#e3f2fd; color:#1565c0; }
+.ordine-data { flex:1; color:var(--ink2); font-size:0.77rem; }
+.ordine-del { background:none; border:none; color:var(--red); cursor:pointer; padding:2px 6px; font-size:0.85rem; flex-shrink:0; line-height:1; }
+.ordine-add-row { display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap; }
+.ordine-add-row input, .ordine-add-row select { padding:6px 8px; border:1px solid var(--border); border-radius:8px; font-size:0.78rem; font-family:inherit; background:var(--surface); color:var(--ink); }
+.ordine-add-row input[type=date] { flex:1; min-width:120px; }
+.ordine-add-row select { flex:1; min-width:120px; }
+/* ── RICHIAMI NOTIFICHE ── */
+.richiamo-data-row { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+.richiamo-data-row input[type=date] { padding:4px 8px; border:1px solid var(--border); border-radius:6px; font-size:0.73rem; font-family:inherit; background:var(--surface); color:var(--ink); }
+.notif-btn { padding:5px 12px; border-radius:16px; border:1.5px solid var(--border); background:var(--card); font-size:0.73rem; font-weight:600; cursor:pointer; transition:all .2s; }
+.notif-btn.active { background:#1565c0; border-color:#1565c0; color:#fff; }
 </style>
 </head>
 <body>
@@ -1257,7 +1293,10 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
   <div id="page-richiami" class="page scroll" style="padding:12px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
       <div class="section-title" style="margin-bottom:0;">🔁 Richiami in sospeso</div>
-      <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderRichiami()">🔄 Aggiorna</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="notif-toggle-btn" class="notif-btn" onclick="toggleNotifiche()">🔔 Notifiche</button>
+        <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 10px;" onclick="renderRichiami()">🔄 Aggiorna</button>
+      </div>
     </div>
     <div id="richiami-list"></div>
   </div>
@@ -1295,9 +1334,13 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div class="modal-section-label">Stato visita</div>
         <div class="stato-chips">
           <div class="stato-chip" data-stato="visitata" onclick="setStato('visitata')">✅ Visitata</div>
-          <div class="stato-chip" data-stato="richiamare" onclick="setStato('richiamare')">🔁 Richiamare</div>
+          <div class="stato-chip" data-stato="richiamare" onclick="setStatoRichiamare()">🔁 Richiamare</div>
           <div class="stato-chip" data-stato="assente" onclick="setStato('assente')">🔴 Assente</div>
           <div class="stato-chip" data-stato="da-visitare" onclick="setStato('da-visitare')">⏳ Da visitare</div>
+        </div>
+        <div id="modal-richiamo-data-row" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.76rem;color:var(--amber);font-weight:700;">📅 Chiama il:</span>
+          <input type="date" id="modal-richiamo-data" style="padding:6px 10px;border:1.5px solid var(--amber);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--ink);">
         </div>
       </div>
       <div>
@@ -1314,8 +1357,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <span style="font-size:0.75rem;color:var(--ink3);">Visita ogni 45 giorni</span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <button id="modal-cliente-btn" onclick="toggleClienteModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">🤝 Cliente</button>
-          <button id="modal-ordinato-btn" onclick="toggleOrdinatoModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ha ordinato</button>
-          <button id="modal-ordine-btn" onclick="quickOrdineModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
+          <button id="modal-ordine-btn" onclick="aggiungiOrdineOggi()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:var(--card);font-size:0.78rem;font-weight:600;cursor:pointer;">📦 Ordine oggi</button>
           <button id="modal-escludi-btn" onclick="toggleEscludiModal()" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--red);background:#fff;color:var(--red);font-size:0.78rem;font-weight:700;cursor:pointer;">🚫 Escludi</button>
         </div>
       </div>
@@ -1334,6 +1376,18 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
       <div>
         <div class="modal-section-label">Note visita</div>
         <textarea class="note-area" id="modal-notes" placeholder="Es: parla con la dott.ssa Rossi, interessata al prodotto X…"></textarea>
+      </div>
+      <div>
+        <div class="modal-section-label">📦 Storico ordini</div>
+        <div class="ordini-list" id="modal-ordini-list"></div>
+        <div class="ordine-add-row">
+          <input type="date" id="modal-ordine-nuova-data">
+          <select id="modal-ordine-tipo">
+            <option value="visita">📦 In visita</option>
+            <option value="telefonico">📞 Telefonico</option>
+          </select>
+          <button class="btn btn-ghost" onclick="aggiungiOrdineManuale()" style="font-size:0.73rem;padding:5px 12px;flex-shrink:0;">+ Aggiungi</button>
+        </div>
       </div>
       <div id="modal-last-visit" style="font-size:0.75rem;color:var(--ink3);"></div>
     </div>
@@ -1749,59 +1803,59 @@ const FARMACIE_RAW = [
   {n:"CARBONE SAS",a:"VIA DANTE ALIGHIERI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"DOTT. BIGLIOLI SRL",a:"LARGO ALBERTO PEDRINI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"FARMAGORA' SONDRIO SRL",a:"PIAZZETTA PIETRO RUSCONI, 5",c:"23100",loc:"SONDRIO",p:"SO"},
-  // ── PARAFARMACIE LC / SO / MB (fonte: Ministero della Salute open data) ──
+  // ── PARAFARMACIE LC / SO / MB ──
   {n:"MEDI-MARKET ITALIA SRL",a:"Via Italia 197",c:"20874",loc:"Busnago",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA CONAD MERATE",a:"Via Bergamo 19",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia Villasanta",a:"Via T. Vecellio, 1",c:"20058",loc:"Villasanta",p:"MB",tipo:"parafarmacia"},
   {n:"Iper Montebello Spa - Iper Busnago",a:"Via Italia, 197",c:"20874",loc:"Busnago",p:"MB",tipo:"parafarmacia"},
   {n:"CURASI SRL",a:"Via Santi Cosma E Damiano 10",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
   {n:"Pharma.Co srl",a:"Via San Vitale 4",c:"23032",loc:"Bormio",p:"SO",tipo:"parafarmacia"},
-  {n:"IPERAL CIVATE",a:"Via Papa Giovanni XXIII 15",c:"23862",loc:"Civate",p:"LC",tipo:"parafarmacia"},
+  {n:"IPERAL CIVATE",a:"Via Papa Giovanni Xxiii 15",c:"23862",loc:"Civate",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia San Bartolomeo",a:"Via Tre Re 66",c:"20861",loc:"Brugherio",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA DOTT.SSA MONICA FAIFER",a:"Via Crosal, 57",c:"23030",loc:"Livigno",p:"SO",tipo:"parafarmacia"},
   {n:"IPERAL CASTIONE ANDEVENNO",a:"Viale Bruno Tirelli, 149",c:"23012",loc:"Castione Andevenno",p:"SO",tipo:"parafarmacia"},
-  {n:"Parafarmacia Dott. Branca",a:"Via Pace, 12",c:"20821",loc:"Meda",p:"MB",tipo:"parafarmacia"},
+  {n:"parafarmacia dott. branca",a:"Via Pace, 12",c:"20821",loc:"Meda",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA OSPEDALE MONZA",a:"Via Giambattista Pergolesi, 33",c:"20052",loc:"Monza",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA IL GIARDINO SRL",a:"Via Foscolo, 12",c:"20843",loc:"Verano Brianza",p:"MB",tipo:"parafarmacia"},
   {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 27",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia Conad Bernareggio",a:"Via Roma, Snc",c:"20881",loc:"Bernareggio",p:"MB",tipo:"parafarmacia"},
-  {n:"L'erboristeria di Emanuela Delucce",a:"Via Buonarroti, 15",c:"20881",loc:"Bernareggio",p:"MB",tipo:"parafarmacia"},
+  {n:"L'erboristeria di Emanuela dott.ssa Delucce",a:"Via Buonarroti, 15",c:"20881",loc:"Bernareggio",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA LECCO",a:"Via Roma, 26",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia Conad",a:"Via Nazionale, 89",c:"23030",loc:"Villa Di Tirano",p:"SO",tipo:"parafarmacia"},
-  {n:"Parafarmacia Vimercate",a:"Via Falcone E Borsellino, 6",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Falcone E Borsellino, 6",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
   {n:"G.M. PARAFARMA",a:"Via Lega Lombarda, 33",c:"20855",loc:"Lesmo",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Frosi",a:"Via Alessandro Volta, 30",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"+Medical Monza",a:"Via Sant'Andrea, 21",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia della Dott.ssa Frosi Maria Clotilde",a:"Via Alessandro Volta, 30",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"+Medical Monza",a:"Via Sant Andrea, 21",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA LA ROCCA",a:"Via Consoli Chiavennaschi, 23",c:"23022",loc:"Chiavenna",p:"SO",tipo:"parafarmacia"},
   {n:"G.M. FARMA S.R.L.",a:"Via Lega Lombarda, 33",c:"20855",loc:"Lesmo",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Varedo",a:"Via Pastrengo, 111",c:"20814",loc:"Varedo",p:"MB",tipo:"parafarmacia"},
-  {n:"+Medical Monza Via Marsala",a:"Via Marsala/Via Solferino",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Pastrengo, 111",c:"20814",loc:"Varedo",p:"MB",tipo:"parafarmacia"},
+  {n:"+Medical Monza Via Marsala",a:"Via Marsala/Via Solferino, Snc",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
   {n:"Parafarmacia Valsassina",a:"Via Provinciale, 93",c:"23818",loc:"Pasturo",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Monza Brembo",a:"Via Brembo",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Monza Buonarroti",a:"Via Buonarroti",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Lecco Buozzi",a:"Via Buozzi, 15",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Brembo",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Buonarroti",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Buozzi, 15",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia Vittorio Emanuele",a:"Via Vittorio Emanuele, 44/B",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia del Lario",a:"Via Statale",c:"23826",loc:"Mandello Del Lario",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Prinetti 2",a:"Piazza Prinetti, 8",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia del Lario di Salus Lario srl",a:"Via Statale",c:"23826",loc:"Mandello Del Lario",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 8",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
   {n:"Iperfarma Monza 1",a:"Via Della Guerrina, 98",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA EMMEPI SRL",a:"Via Vallecetta, 1",c:"23032",loc:"Bormio",p:"SO",tipo:"parafarmacia"},
   {n:"PARAFARMACIA BRUGHERIO",a:"Viale Lombardia, 264",c:"20861",loc:"Brugherio",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA DOTT.SSA R. MARIANI",a:"Piazza 11 Febbraio, 11",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Lissone",a:"Via G. Giardino / Via Valassina",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia EmmeGi Casatenovo",a:"Piazza Della Repubblica, 2",c:"23880",loc:"Casatenovo",p:"LC",tipo:"parafarmacia"},
-  {n:"Umanvet Parafarmacia",a:"Via Kennedy, 1",c:"20811",loc:"Cesano Maderno",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA DOTT.SSA R. MARIANI",a:"Piazza 11 Febbraio, 11",c:"28046",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Via G. Giardino Ang. Via Valassina, Snc",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia & Erboristeria EmmeGi di D.ssa  Marina Geme",a:"Piazza Della Repubblica, 2",c:"23880",loc:"Casatenovo",p:"LC",tipo:"parafarmacia"},
+  {n:"umanvet parafarmacia sas di dott. paolo manetti & c.",a:"Via Kennedy, 1",c:"20811",loc:"Cesano Maderno",p:"MB",tipo:"parafarmacia"},
   {n:"PARAFARMACIA E'QUI CASATENOVO",a:"Via Casati, 28",c:"23880",loc:"Casatenovo",p:"LC",tipo:"parafarmacia"},
   {n:"Parafarmacia della Dida",a:"Piazza Manzoni, 12",c:"23848",loc:"Oggiono",p:"LC",tipo:"parafarmacia"},
   {n:"PARAFARMACIA E'QUI CASTELLO DI BRIANZA",a:"Via Don G. Allamano, 1",c:"23884",loc:"Castello Di Brianza",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Monza Libertà",a:"Viale Libertà",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"NEW PHARM S.R.L.",a:"Via Tommaso Nani, 50",c:"23100",loc:"Sondrio",p:"SO",tipo:"parafarmacia"},
-  {n:"France's Sas",a:"Via Della Filanda, 14",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
-  {n:"Medi-Market Monza",a:"Via Italia, 39",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Prima srl Lissone",a:"Largo Bruno Salvadori, 3",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Viale Libertã , Snc",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"NEW PHARM  S.R.L.",a:"Via Tommaso Nani, 50",c:"23100",loc:"Sondrio",p:"SO",tipo:"parafarmacia"},
+  {n:"France's Sas",a:"Via Via Della Filanda, 14",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
+  {n:"Medi-Market srl",a:"Via Italia, 39",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"Prima srl",a:"Largo Bruno Salvadori, 3",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
   {n:"SFERI S.r.l.",a:"Via Bergamo 15",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia San Carlo",a:"Via Marsala 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"parafarmacia San Carlo",a:"Via Marsala 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
   {n:"Parafarmacia Monguzzi",a:"Monza",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Lo Speziale di Mario Villa",a:"Via Cavallotti 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"lo speziale di dott. mario villa e c. snc",a:"Via Cavallotti 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
 ];
 
 // Genera ID univoci
@@ -1867,6 +1921,33 @@ let routeWeekOffset = 0;
 let currentPercorsoIdx = 0;
 let currentRoute = [];
 let selectedDay = 0;
+
+function saveRoute() {
+  try {
+    localStorage.setItem('farmarete_route', JSON.stringify({
+      days: currentRoute.map(day => day.map(f => f.id)),
+      dates: routeDates.map(d => d instanceof Date ? d.toISOString() : d),
+      selectedDay,
+      weekOffset: routeWeekOffset
+    }));
+  } catch(e) {}
+}
+
+function loadSavedRoute() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('farmarete_route') || 'null');
+    if (!saved || !saved.days || !saved.days.length) return false;
+    const farmMap = {};
+    FARMACIE.forEach(f => { farmMap[String(f.id)] = f; });
+    currentRoute = saved.days.map(day => day.map(id => farmMap[String(id)]).filter(Boolean));
+    routeDates = (saved.dates || []).map(d => new Date(d));
+    selectedDay = saved.selectedDay || 0;
+    routeWeekOffset = saved.weekOffset || 0;
+    const label = document.getElementById('week-label');
+    if (label) label.textContent = routeWeekOffset === 0 ? 'Sett. corrente' : `+${routeWeekOffset} sett.`;
+    return currentRoute.some(d => d.length > 0);
+  } catch(e) { return false; }
+}
 let currentFilter = 'all';
 let currentFarmaciaId = null;
 let searchQuery = '';
@@ -1888,7 +1969,7 @@ function showPage(name, tab) {
   if (name !== 'farmacie') { searchQuery = ''; const i = document.getElementById('farmacie-search-input'); if(i) i.value=''; }
   if (name === 'farmacie') renderFarmacie();
   if (name === 'scadenze') renderScadenze();
-  if (name === 'richiami') renderRichiami();
+  if (name === 'richiami') { renderRichiami(); aggiornaNotifBtn(); }
 }
 
 // ══════════════════════════════════════════════
@@ -2009,7 +2090,10 @@ function giorniDaUltima(id) {
     if (appt > oggi) return -1; // valore speciale: appuntamento futuro
   }
   if (!fd.dataVisita) return Infinity;
-  return Math.floor((Date.now() - new Date(String(fd.dataVisita).slice(0,10) + "T12:00:00").getTime()) / 86400000);
+  let dvStr2 = String(fd.dataVisita).slice(0,10);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr2)) dvStr2 = dvStr2.slice(6)+'-'+dvStr2.slice(3,5)+'-'+dvStr2.slice(0,2);
+  const gg2 = Math.floor((Date.now() - new Date(dvStr2 + 'T12:00:00').getTime()) / 86400000);
+  return isNaN(gg2) ? Infinity : gg2;
 }
 
 function isAppuntamentoFuturo(id) {
@@ -2047,14 +2131,9 @@ function calcolaFrequenzaAdattiva() {
 }
 
 function frequenzaDefault(fd) {
-  // Default per tipo: Top=30gg, Cliente=45gg, Potenziale=90gg
-  if (fd.isTop) return 30;
-  if (fd.isCliente || fd.stato === 'da-visitare') return 45;
-  if (fd.priorita === 'caldo') return 60;
-  if (fd.priorita === 'tiepido') return 90;
-  if (fd.priorita === 'freddo') return 120;
-  if (fd.stato === 'potenziale') return 90;
-  return 45; // default generico
+  if (fd.isTop) return 45;          // top client: ogni 45 giorni
+  if (fd.priorita === 'caldo') return 60;  // interesse attivo: ogni 60 giorni
+  return 90;                         // tutto il resto: 90 giorni default
 }
 
 function frequenza(id) {
@@ -2474,14 +2553,21 @@ function buildRoute() {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return false; // solo nella sezione Richiami
+    if (fd.stato === 'richiamare') return false;
     if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-    if (fd.dataVisita) {
-      const dvStr = String(fd.dataVisita).slice(0, 10);
+    // Usa la data più recente tra visita e appuntamento passato come riferimento
+    const dateRef = [fd.dataVisita, fd.dataAppuntamento]
+      .filter(Boolean)
+      .map(d => String(d).slice(0,10))
+      .filter(d => d <= todayYMD)
+      .sort().pop();
+    if (dateRef) {
+      let dvStr = dateRef;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr)) dvStr = dvStr.slice(6)+'-'+dvStr.slice(3,5)+'-'+dvStr.slice(0,2);
       const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
+      if (isNaN(gg)) return false;
       const freq = fd.frequenza || frequenzaDefault(fd);
-      // dataVisita è la verità: escludi sempre se recente, indipendentemente dallo stato
-      if (fd.stato === 'assente') { if (gg < 3) return false; }
+      if (fd.stato === 'assente') { if (gg < 14) return false; }
       else { if (gg < freq) return false; }
     }
     return true;
@@ -2557,9 +2643,39 @@ function buildRoute() {
         currentLoc = chosen.loc;
       }
 
-      days.push(dayRoute);
+      days.push(sortGeoDay(dayRoute, startPoint.label, _getFD));
     }
     return days;
+  }
+
+  // Riordina geograficamente un giorno — nearest-neighbor dal punto di partenza
+  // Le farmacie con appuntamento pomeridiano restano in fondo
+  function sortGeoDay(pharmacies, startLoc, getFDfn) {
+    if (pharmacies.length <= 1) return pharmacies;
+    // Separa farmacie con appuntamento tardo (>= 13:00) dalle altre
+    const tardy = pharmacies.filter(f => {
+      const ora = getFDfn(f.id).oraAppuntamento || '';
+      return ora >= '13:00';
+    });
+    const free = pharmacies.filter(f => {
+      const ora = getFDfn(f.id).oraAppuntamento || '';
+      return !ora || ora < '13:00';
+    });
+    // Riordina la parte "libera" con nearest-neighbor
+    const sortNN = (list, loc) => {
+      const rem = [...list]; const sorted = [];
+      let cur = loc;
+      while (rem.length > 0) {
+        const best = rem.map((f,i) => ({f,i,t:travelMinutes(cur,f.loc)})).sort((a,b)=>a.t-b.t)[0];
+        sorted.push(best.f); cur = best.f.loc; rem.splice(best.i,1);
+      }
+      return sorted;
+    };
+    const sortedFree = sortNN(free, startLoc);
+    const lastFreeLoc = sortedFree.length > 0 ? sortedFree[sortedFree.length-1].loc : startLoc;
+    // Appuntamenti tardi in ordine geografico dalla fine delle visite libere
+    const sortedTardy = sortNN(tardy, lastFreeLoc);
+    return [...sortedFree, ...sortedTardy];
   }
 
   // Tre varianti con logica distinta + seed settimanale per varietà tra settimane
@@ -2695,11 +2811,15 @@ function renderDayTabs() {
   const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
   const mesi = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
   const todayStr = toYMD(new Date());
+  let firstVisibleIdx = -1;
   currentRoute.forEach((day, i) => {
-    const btn = document.createElement('button');
     const d = routeDates[i];
-    const isToday = d && toYMD(d) === todayStr;
-    btn.className = 'day-btn' + (i===0?' active':'');
+    const dayStr = d ? toYMD(d) : null;
+    if (dayStr && dayStr < todayStr) return; // nascondi giorni passati
+    if (firstVisibleIdx === -1) firstVisibleIdx = i;
+    const btn = document.createElement('button');
+    const isToday = dayStr === todayStr;
+    btn.className = 'day-btn' + (i === selectedDay ? ' active' : '') + (isToday ? ' oggi' : '');
     const label = d
       ? `${giorni[d.getDay()]} ${d.getDate()} ${mesi[d.getMonth()]} (${day.length})`
       : `Giorno ${i+1} (${day.length})`;
@@ -2709,9 +2829,14 @@ function renderDayTabs() {
       btn.classList.add('active');
       renderDayList(i);
       selectedDay = i;
+      saveRoute();
     };
     scroller.appendChild(btn);
   });
+  // Se selectedDay è nel passato, vai al primo giorno visibile
+  if (firstVisibleIdx >= 0 && routeDates[selectedDay] && toYMD(routeDates[selectedDay]) < todayStr) {
+    selectedDay = firstVisibleIdx;
+  }
 }
 
 function renderDayList(dayIdx) {
@@ -2780,13 +2905,18 @@ function renderDayList(dayIdx) {
           <button class="btn-esito assente${stato==='assente'?' active-esito':''}" onclick="quickEsito(event,${f.id},'assente')">🔴 Assente</button>
           <button class="btn-esito richiamo${stato==='richiamare'?' active-esito':''}" onclick="quickEsito(event,${f.id},'richiamare')">🔁 Richiamare</button>
           <button class="btn-esito" onclick="event.stopPropagation();navigaVerso('${f.a}, ${f.loc}, Italia', true)" style="background:#546e7a;color:#fff;font-weight:700;">🗺 Anteprima</button>
-          ${f.tipo==='parafarmacia' ? `<button class="btn-esito" onclick="event.stopPropagation();quickEscludiPF(${f.id})" style="background:#7c3aed;color:#fff;font-weight:700;">🚫 Escludi PF</button>` : ''}
+          ${f.tipo==='parafarmacia'?`<button class="btn-esito" onclick="event.stopPropagation();quickEscludiPF(${f.id})" style="background:#7c3aed;color:#fff;font-weight:700;">🚫 Escludi PF</button>`:''}
         </div>
       </div>
       <div class="route-badge ${f.tipo==='parafarmacia'?'badge-pf':f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':'badge-so'}">${f.tipo==='parafarmacia'?'PF':f.p}</div>
     `;
     list.appendChild(item);
   });
+
+  // Spacer reale per Android Chrome — il padding-bottom nei flex container viene ignorato
+  const scrollSpacer = document.createElement('div');
+  scrollSpacer.style.cssText = 'height:120px;min-height:120px;flex-shrink:0;width:100%;';
+  list.appendChild(scrollSpacer);
 
   document.getElementById('map-toolbar-info').innerHTML = `📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate`;
   
@@ -2810,28 +2940,29 @@ function renderDayList(dayIdx) {
   }
   
   showMapsPanel(dayIdx);
+  fixMobileScroll();
 }
 
-function quickEscludiPF(id) {
-  id = String(id);
-  loadEscluse();
-  if (escluseIds.has(id)) {
-    escluseIds.delete(id);
-    delete escluseData[id];
-    showToast('✅ Parafarmacia reintrodotta nel giro', 'ok');
-  } else {
-    escluseIds.add(id);
-    escluseData[id] = { data: toYMD(new Date()) };
-    if (currentRoute[selectedDay]) {
-      currentRoute[selectedDay] = currentRoute[selectedDay].filter(f => String(f.id) !== id);
-    }
-    showToast('🚫 Parafarmacia esclusa dal giro', 'info');
-  }
-  saveEscluse();
-  saveRoute();
-  renderDayTabs();
-  renderDayList(selectedDay);
-  updateBadges();
+function fixMobileScroll() {
+  if (window.innerWidth > 767) return;
+  requestAnimationFrame(function() {
+    const page = document.getElementById('page-percorso');
+    if (!page) return;
+    const body = page.querySelector('.percorso-body');
+    const controls = page.querySelector('.percorso-controls');
+    const dayScroller = page.querySelector('.day-scroller');
+    if (!body || !controls || !dayScroller) return;
+    const pageH = page.offsetHeight;
+    const bodyH = pageH - controls.offsetHeight - dayScroller.offsetHeight;
+    if (bodyH < 100) return;
+    body.style.cssText = 'display:flex;flex-direction:column;overflow-y:scroll;overflow-x:hidden;-webkit-overflow-scrolling:touch;height:' + bodyH + 'px;flex:none;';
+    const wrap = body.querySelector('.route-list-wrap');
+    if (wrap) { wrap.style.flexShrink = '0'; wrap.style.overflow = 'visible'; wrap.style.height = 'auto'; }
+    const list = body.querySelector('.route-list');
+    if (list) { list.style.height = 'auto'; list.style.maxHeight = 'none'; list.style.overflow = 'visible'; list.style.flex = 'none'; }
+    const mapWrap = body.querySelector('.map-wrap');
+    if (mapWrap) { mapWrap.style.flex = 'none'; mapWrap.style.flexShrink = '0'; mapWrap.style.minHeight = '220px'; mapWrap.style.overflow = 'visible'; }
+  });
 }
 
 function quickEsito(e, id, esito) {
@@ -2839,13 +2970,18 @@ function quickEsito(e, id, esito) {
   id = String(id);
   const fd = getFD(id);
   if (fd.stato === esito) {
+    // Deseleziona: ripristina farmacia nel giorno corrente
     setFD(id, {stato:'', dataVisita:null, dataAppuntamento:null});
     localStorage.removeItem('farmarete_last_visit');
+    const day = currentRoute[selectedDay] || [];
+    if (!day.find(f => String(f.id) === id)) {
+      const farm = FARMACIE.find(f => String(f.id) === id);
+      if (farm) currentRoute[selectedDay] = [...day, farm];
+    }
   } else {
     const update = {stato:esito, dataVisita:toYMD(new Date())};
     if (esito === 'visitata') {
       update.dataAppuntamento = null;
-      // Apprendimento adattivo: calcola durata visita precedente
       try {
         const last = JSON.parse(localStorage.getItem('farmarete_last_visit') || 'null');
         const now = Date.now();
@@ -2863,11 +2999,49 @@ function quickEsito(e, id, esito) {
       } catch(e) {}
     }
     setFD(id, update);
+    // Rimuovi dal giorno corrente
+    if (currentRoute[selectedDay]) {
+      currentRoute[selectedDay] = currentRoute[selectedDay].filter(f => String(f.id) !== id);
+    }
+    // Se assente: reinserisci nel giorno futuro geograficamente più vicino
+    if (esito === 'assente') {
+      reinserisciAssente(id);
+    }
   }
+  saveRoute();
+  renderDayTabs();
   renderDayList(selectedDay);
   updateBadges();
   autoUploadAfterSave();
   haptic(esito === 'visitata' ? 'success' : 'light');
+}
+
+function reinserisciAssente(id) {
+  const farm = FARMACIE.find(f => String(f.id) === id);
+  if (!farm) return;
+  let bestDay = -1, bestPos = 0, bestScore = Infinity;
+  // Cerca nei prossimi 3 giorni del percorso
+  for (let d = selectedDay + 1; d < Math.min(currentRoute.length, selectedDay + 4); d++) {
+    const day = currentRoute[d];
+    if (!day || !day.length) continue;
+    if (day.find(f => String(f.id) === id)) continue; // già presente
+    for (let pos = 0; pos <= day.length; pos++) {
+      const prev = pos > 0 ? day[pos-1] : null;
+      const next = pos < day.length ? day[pos] : null;
+      const score = (prev ? travelMinutes(prev.loc, farm.loc) : 0)
+                  + (next ? travelMinutes(farm.loc, next.loc) : 0);
+      if (score < bestScore) { bestScore = score; bestDay = d; bestPos = pos; }
+    }
+    if (bestDay === d) break; // Preferisci il giorno più vicino se il fit è buono
+  }
+  if (bestDay >= 0) {
+    currentRoute[bestDay] = [
+      ...currentRoute[bestDay].slice(0, bestPos),
+      farm,
+      ...currentRoute[bestDay].slice(bestPos)
+    ];
+    showToast(`🔴 Assente — reinserita nel giorno ${bestDay - selectedDay === 1 ? 'dopo' : 'seguente'}`, 'info');
+  }
 }
 
 function quickOrdine(e, id) {
@@ -2943,6 +3117,17 @@ function ripristinaFarmacia(id) {
   saveEscluse();
   showRigeneraBanner('🔓 Ripristinata — premi 🔄 per aggiornare il percorso');
 }
+// Generatore pseudo-casuale con seed (LCG) — sostituisce shuffle rotto
+function seededRand(seed) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return function() {
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = (s ^ (s >>> 16)) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
 function ricalcolaGiorno(dayIdx) {
   // Prendi GPS reale del dispositivo, poi calcola
   if (navigator.geolocation) {
@@ -2956,12 +3141,19 @@ function ricalcolaGiorno(dayIdx) {
   }
 }
 
+const _ricalcolaCounter = {};
+
 function _eseguiRicalcola(dayIdx, deviceGPS) {
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
   const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
+
+  // Contatore ciclo: ogni pressione dà opzioni diverse, cicla su 5
+  _ricalcolaCounter[dayIdx] = ((_ricalcolaCounter[dayIdx] || 0) % 5) + 1;
+  const cycleOffset = _ricalcolaCounter[dayIdx] * 10000;
+  const baseSeed = Math.floor(new Date((dayStr||'2024-01-01') + 'T12:00:00').getTime() / 86400000) + cycleOffset;
 
   // Appuntamenti fissi del giorno
   const pinned = FARMACIE.filter(f => {
@@ -2990,11 +3182,15 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
       const fd = _getFD(f.id);
       if (fd.stato === 'richiamare') return false;
       if (fd.dataAppuntamento && toYMD(fd.dataAppuntamento) >= todayYMD) return false;
-      if (fd.dataVisita) {
-        const dvStr = String(fd.dataVisita).slice(0, 10);
+      const dateRef2 = [fd.dataVisita, fd.dataAppuntamento]
+        .filter(Boolean).map(d => String(d).slice(0,10)).filter(d => d <= todayYMD).sort().pop();
+      if (dateRef2) {
+        let dvStr = dateRef2;
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dvStr)) dvStr = dvStr.slice(6)+'-'+dvStr.slice(3,5)+'-'+dvStr.slice(0,2);
         const gg = Math.floor((Date.now() - new Date(dvStr + 'T12:00:00').getTime()) / 86400000);
+        if (isNaN(gg)) return false;
         const freq = fd.frequenza || frequenzaDefault(fd);
-        if (fd.stato === 'assente') { if (gg < 3) return false; }
+        if (fd.stato === 'assente') { if (gg < 14) return false; }
         else { if (gg < freq) return false; }
       }
       return true;
@@ -3029,9 +3225,10 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     // Parte sempre dalla posizione GPS reale — coerenza geografica garantita
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Date.now() + seedOffset;
+    const s = baseSeed + seedOffset;
+    const rand = seededRand(s);
     for (let i = rem.length - 1; i > 0; i--) {
-      const j = Math.floor((s * (i + 1)) % (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
     }
     if (strategy === 'priorita') rem.sort((a,b) => pri(a)-pri(b));
@@ -3075,9 +3272,10 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     const result = [...pinned];
     let loc = gpsLoc;
     const rem = [...poolInput];
-    const s = Date.now() + seedOffset;
+    const s = baseSeed + seedOffset;
+    const rand = seededRand(s);
     for (let i = rem.length - 1; i > 0; i--) {
-      const j = Math.floor((s * (i + 1)) % (i + 1));
+      const j = Math.floor(rand() * (i + 1));
       [rem[i], rem[j]] = [rem[j], rem[i]];
     }
     // Solo distanza, nessuna priorità
@@ -3122,6 +3320,7 @@ function _eseguiRicalcola(dayIdx, deviceGPS) {
     card.querySelector('button').onclick = () => {
       allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = alt.day; });
       currentRoute[dayIdx] = alt.day;
+      saveRoute();
       document.getElementById('ricalcola-overlay').classList.remove('open');
       renderDayTabs();
       renderDayList(dayIdx);
@@ -3449,12 +3648,13 @@ function quickEsitoScad(id, esito) {
 function renderRichiami() {
   const list = document.getElementById('richiami-list');
   const richiami = FARMACIE.filter(f => getFD(f.id).stato === 'richiamare');
-  if (!richiami.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔁</div><h4>Nessun richiamo</h4><p>Nessuna farmacia da richiamare.</p></div>'; return; }
+  if (!richiami.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔁</div><h4>Nessun richiamo</h4><p>Nessuna farmacia da richiamare.</p></div>'; aggiornaNotifBtn(); return; }
   const data = loadData();
-  // Ordina per data segnalazione (prima i più vecchi)
+  const oggi = toYMD(new Date());
+  // Ordina: scaduti prima, poi per data richiamo, poi per data visita
   richiami.sort((a,b) => {
-    const da = data[String(a.id)]?.dataVisita || '9999';
-    const db = data[String(b.id)]?.dataVisita || '9999';
+    const da = data[String(a.id)]?.dataRichiamo || data[String(a.id)]?.dataVisita || '9999';
+    const db = data[String(b.id)]?.dataRichiamo || data[String(b.id)]?.dataVisita || '9999';
     return da.localeCompare(db);
   });
   list.innerHTML = richiami.map(f => {
@@ -3463,7 +3663,13 @@ function renderRichiami() {
     const prioBadge = fd.isTop ? '<span style="font-size:0.62rem;font-weight:700;background:var(--amber);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">⭐ TOP</span>'
       : fd.isCliente ? '<span style="font-size:0.62rem;font-weight:700;background:var(--green);color:#fff;padding:1px 5px;border-radius:5px;margin-right:4px;">🤝 CLI</span>' : '';
     const attesaColor = gg > 14 ? 'var(--red)' : gg > 7 ? 'var(--amber)' : 'var(--ink3)';
-    return `<div class="scad-item" style="border-left:4px solid var(--amber);cursor:pointer;" onclick="openModal(${f.id})">
+    const dr = fd.dataRichiamo ? String(fd.dataRichiamo).slice(0,10) : '';
+    const drScaduto = dr && dr < oggi;
+    const drOggi = dr === oggi;
+    const drFuturo = dr && dr > oggi;
+    const drColor = drScaduto ? 'var(--red)' : drOggi ? 'var(--amber)' : 'var(--green)';
+    const drLabel = drScaduto ? '⚠️ Scaduto il '+formatDate(dr) : drOggi ? '⏰ Da chiamare OGGI!' : drFuturo ? '📆 '+formatDate(dr) : '';
+    return `<div class="scad-item" style="border-left:4px solid ${drScaduto?'var(--red)':drOggi?'var(--amber)':'var(--amber)'};cursor:pointer;" onclick="openModal(${f.id})">
       <div style="display:flex;align-items:flex-start;gap:8px;">
         <div style="flex:1;min-width:0;">
           <div class="scad-nome">${prioBadge}${fd.nomeCustom||f.n}</div>
@@ -3471,6 +3677,11 @@ function renderRichiami() {
           ${fd.note ? `<div style="font-size:0.72rem;color:var(--ink2);margin-top:4px;padding:5px 8px;background:var(--amber-light);border-radius:6px;">📝 ${fd.note}</div>` : ''}
           <div style="font-size:0.68rem;margin-top:4px;color:${attesaColor};font-weight:600;">
             🔁 Segnato ${gg !== null ? (gg===0?'oggi':gg===1?'ieri':gg+' giorni fa') : 'il '+formatDate(fd.dataVisita)}
+          </div>
+          <div class="richiamo-data-row" onclick="event.stopPropagation()">
+            <span style="font-size:0.71rem;color:var(--ink3);white-space:nowrap;">📅 Chiama il:</span>
+            <input type="date" value="${dr}" onchange="setDataRichiamo(${f.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.73rem;font-family:inherit;background:var(--surface);color:var(--ink);">
+            ${drLabel ? `<span style="font-size:0.68rem;font-weight:700;color:${drColor};white-space:nowrap;">${drLabel}</span>` : ''}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
@@ -3480,6 +3691,7 @@ function renderRichiami() {
       </div>
     </div>`;
   }).join('');
+  aggiornaNotifBtn();
 }
 
 function quickEsitoRich(id, esito) {
@@ -3605,7 +3817,7 @@ function openModal(id) {
   document.getElementById('modal-nome').value = nomeCustom;
   document.getElementById('modal-subtitle').textContent = `📍 ${f.a} · ${f.loc} (${f.c})`;
   document.getElementById('modal-notes').value = fd.note || '';
-  document.getElementById('modal-freq').value = fd.frequenza || (fd.isTop?45:90);
+  document.getElementById('modal-freq').value = fd.frequenza || (fd.isTop ? 45 : fd.priorita === 'caldo' ? 60 : 90);
   // Data visita / appuntamento
   const dataInput = document.getElementById('modal-data-visita');
   const hint = document.getElementById('modal-data-hint');
@@ -3676,6 +3888,16 @@ function openModal(id) {
 
   document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato === fd.stato));
   document.querySelectorAll('.prio-chip').forEach(c => c.classList.toggle('active', c.dataset.prio === fd.priorita));
+  // Mostra campo data richiamo se stato = richiamare
+  const richRow = document.getElementById('modal-richiamo-data-row');
+  const richInput = document.getElementById('modal-richiamo-data');
+  if (fd.stato === 'richiamare') {
+    richRow.style.display = 'flex';
+    richInput.value = fd.dataRichiamo ? String(fd.dataRichiamo).slice(0,10) : '';
+  } else {
+    richRow.style.display = 'none';
+    richInput.value = '';
+  }
 
   const gg = giorniDaUltima(id);
   const lv = document.getElementById('modal-last-visit');
@@ -3683,10 +3905,22 @@ function openModal(id) {
   else lv.textContent = 'Mai visitata';
 
   document.getElementById('modal-overlay').classList.add('open');
+  loadOrdiniModal(id);
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalIfOutside(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
-function setStato(stato) { document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato===stato)); }
+function setStato(stato) {
+  document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato===stato));
+  const row = document.getElementById('modal-richiamo-data-row');
+  if (row) row.style.display = 'none';
+}
+function setStatoRichiamare() {
+  document.querySelectorAll('.stato-chip').forEach(c => c.classList.toggle('active', c.dataset.stato==='richiamare'));
+  const row = document.getElementById('modal-richiamo-data-row');
+  if (row) row.style.display = 'flex';
+  const inp = document.getElementById('modal-richiamo-data');
+  if (inp && !inp.value) inp.value = toYMD(new Date(Date.now() + 86400000));
+}
 function setPrio(prio) { document.querySelectorAll('.prio-chip').forEach(c => c.classList.toggle('active', c.dataset.prio===prio)); }
 function toggleClienteModal() {
   const btn = document.getElementById('modal-cliente-btn');
@@ -3764,6 +3998,21 @@ function saveModal() {
   } else if (stato && stato !== 'da-visitare') {
     update.dataVisita = new Date().toISOString().slice(0,10);
     update.dataAppuntamento = null;
+  }
+  // Salva data richiamo se stato = richiamare
+  const richInput = document.getElementById('modal-richiamo-data');
+  if (stato === 'richiamare' && richInput?.value) {
+    update.dataRichiamo = richInput.value;
+  } else if (stato && stato !== 'richiamare') {
+    update.dataRichiamo = null;
+  }
+  // Salva storico ordini
+  update.ordini = [..._ordiniPending];
+  update.haOrdine = _ordiniPending.length > 0;
+  update.haOrdinato = _ordiniPending.length > 0; // usato dal routing per priorità
+  if (_ordiniPending.length > 0) {
+    const latest = [..._ordiniPending].sort((a,b) => b.data.localeCompare(a.data))[0];
+    update.dataOrdine = latest.data;
   }
   setFD(currentFarmaciaId, update);
   autoUploadAfterSave();
@@ -4217,10 +4466,15 @@ window.addEventListener('load', () => {
   loadEscluse();
   document.getElementById('prov-filter').value = 'ALL';
   refreshDashboard();
-  buildRoute();
+  // Carica il percorso salvato — NON rigenerare automaticamente
+  if (loadSavedRoute()) {
+    renderDayTabs();
+    renderDayList(selectedDay);
+  }
   renderFarmacie();
   renderScadenze();
   renderRichiami();
+  aggiornaNotifBtn(); // Ripristina stato notifiche salvato
   generatePWAIcon();
 
   // SERVICE WORKER
@@ -4228,15 +4482,15 @@ window.addEventListener('load', () => {
     navigator.serviceWorker.register('/FarmaRete/sw.js').catch(() => {});
   }
 
-  // TAP FEEDBACK su tutti i bottoni
-  document.addEventListener('click', e => {
-    const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-pill, .btn-esito, .pa-tab, .maps-btn, .btn-riammetti');
+  // TAP FEEDBACK istantaneo — touchstart invece di click elimina il 300ms delay
+  document.addEventListener('touchstart', e => {
+    const btn = e.target.closest('button, .btn, .nav-tab, .filter-chip, .stato-chip, .prio-chip, .day-btn, .btn-esito, .maps-btn, .btn-riammetti');
     if (!btn) return;
     btn.classList.remove('tap-flash');
     void btn.offsetWidth;
     btn.classList.add('tap-flash');
     btn.addEventListener('animationend', () => btn.classList.remove('tap-flash'), { once: true });
-  });
+  }, { passive: true });
 
   // iOS install hint (after 3s, only once)
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -4244,4 +4498,147 @@ window.addEventListener('load', () => {
     setTimeout(() => showInstallBanner('ios'), 3000);
   }
 });
+// ══════════════════════════════════════════════
+// STORICO ORDINI
+// ══════════════════════════════════════════════
+let _ordiniPending = [];
+
+function loadOrdiniModal(id) {
+  const fd = getFD(String(id));
+  // Migrazione da vecchio formato
+  if (fd.ordini && Array.isArray(fd.ordini)) {
+    _ordiniPending = [...fd.ordini];
+  } else {
+    _ordiniPending = [];
+    if (fd.haOrdine && fd.dataOrdine) _ordiniPending.push({data: String(fd.dataOrdine).slice(0,10), tipo: 'visita'});
+    else if (fd.haOrdinato) _ordiniPending.push({data: fd.dataVisita ? String(fd.dataVisita).slice(0,10) : toYMD(new Date()), tipo: 'visita'});
+  }
+  // Default date = oggi
+  const inp = document.getElementById('modal-ordine-nuova-data');
+  if (inp) inp.value = toYMD(new Date());
+  renderOrdiniModal();
+}
+
+function renderOrdiniModal() {
+  const list = document.getElementById('modal-ordini-list');
+  if (!list) return;
+  if (!_ordiniPending.length) {
+    list.innerHTML = '<div style="font-size:0.72rem;color:var(--ink3);padding:4px 0;">Nessun ordine registrato</div>';
+    return;
+  }
+  const sorted = [..._ordiniPending].sort((a,b) => b.data.localeCompare(a.data));
+  list.innerHTML = sorted.map(o => `
+    <div class="ordine-item">
+      <span class="ordine-tipo ${o.tipo}">${o.tipo==='telefonico'?'📞 Tel':'📦 Vis'}</span>
+      <span class="ordine-data">${formatDate(o.data)}</span>
+      <button class="ordine-del" onclick="rimuoviOrdinePending('${o.data}','${o.tipo}')">✕</button>
+    </div>`).join('');
+  // Aggiorna aspetto tasto Ordine oggi
+  const btn = document.getElementById('modal-ordine-btn');
+  if (btn) { btn.style.background = _ordiniPending.some(o=>o.data===toYMD(new Date())) ? '#e8f5e9' : ''; btn.style.color = _ordiniPending.some(o=>o.data===toYMD(new Date())) ? '#2e7d32' : ''; }
+}
+
+function aggiungiOrdineOggi() {
+  const today = toYMD(new Date());
+  if (!_ordiniPending.some(o=>o.data===today && o.tipo==='visita')) {
+    _ordiniPending.push({data: today, tipo: 'visita'});
+    renderOrdiniModal();
+    showToast('📦 Ordine di oggi aggiunto', 'ok');
+  } else {
+    showToast('📦 Ordine di oggi già presente', 'info');
+  }
+}
+
+function aggiungiOrdineManuale() {
+  const data = document.getElementById('modal-ordine-nuova-data')?.value;
+  const tipo = document.getElementById('modal-ordine-tipo')?.value || 'visita';
+  if (!data) { showToast('Inserisci una data', 'warn'); return; }
+  _ordiniPending.push({data, tipo});
+  renderOrdiniModal();
+  document.getElementById('modal-ordine-nuova-data').value = toYMD(new Date());
+}
+
+function rimuoviOrdinePending(data, tipo) {
+  const idx = _ordiniPending.findIndex(o => o.data===data && o.tipo===tipo);
+  if (idx >= 0) { _ordiniPending.splice(idx, 1); renderOrdiniModal(); }
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICHE RICHIAMI
+// ══════════════════════════════════════════════
+function toggleNotifiche() {
+  const attive = localStorage.getItem('farmarete_notifiche') === 'true';
+  if (!attive) {
+    if (!('Notification' in window)) { showToast('Browser non supporta notifiche', 'warn'); return; }
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') {
+        localStorage.setItem('farmarete_notifiche', 'true');
+        showToast('🔔 Notifiche attivate!', 'ok');
+        aggiornaNotifBtn();
+        checkNotificheRichiami();
+      } else {
+        showToast('Permesso negato. Abilitalo dalle impostazioni del browser.', 'warn');
+      }
+    });
+  } else {
+    localStorage.setItem('farmarete_notifiche', 'false');
+    showToast('🔕 Notifiche disattivate', 'info');
+    aggiornaNotifBtn();
+  }
+}
+
+function aggiornaNotifBtn() {
+  const btn = document.getElementById('notif-toggle-btn');
+  if (!btn) return;
+  const attive = localStorage.getItem('farmarete_notifiche') === 'true';
+  btn.classList.toggle('active', attive);
+  btn.textContent = attive ? '🔔 Notifiche ON' : '🔕 Notifiche OFF';
+}
+
+function checkNotificheRichiami() {
+  if (localStorage.getItem('farmarete_notifiche') !== 'true') return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const oggi = toYMD(new Date());
+  const domani = toYMD(new Date(Date.now() + 86400000));
+  const data = loadData();
+  FARMACIE.forEach(f => {
+    const fd = data[String(f.id)] || {};
+    if (fd.stato !== 'richiamare' || !fd.dataRichiamo) return;
+    const dr = String(fd.dataRichiamo).slice(0,10);
+    if (dr === oggi || dr === domani) {
+      const quando = dr === oggi ? 'OGGI' : 'domani';
+      try {
+        new Notification(`🔁 Richiamo ${quando}: ${fd.nomeCustom||f.n}`, {
+          body: `📍 ${f.loc}${fd.note ? ' · '+fd.note.slice(0,60) : ''}`,
+          icon: '/FarmaRete/icon-192.png',
+          tag: 'richiamo-'+f.id
+        });
+      } catch(e) {}
+    }
+  });
+}
+
+function setDataRichiamo(id, val) {
+  setFD(String(id), {dataRichiamo: val || null});
+  updateBadges();
+}
+
+// Controlla notifiche all'apertura dell'app e quando la pagina torna in primo piano
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNotificheRichiami(); });
+setTimeout(checkNotificheRichiami, 2000);
+
+function quickEscludiPF(id) {
+  id = String(id);
+  loadEscluse();
+  if (escluseIds.has(id)) {
+    escluseIds.delete(id); delete escluseData[id];
+    showToast('✅ Parafarmacia reintrodotta nel giro', 'ok');
+  } else {
+    escluseIds.add(id); escluseData[id] = {data: toYMD(new Date())};
+    if (currentRoute[selectedDay]) currentRoute[selectedDay] = currentRoute[selectedDay].filter(f => String(f.id) !== id);
+    showToast('🚫 Parafarmacia esclusa dal giro', 'info');
+  }
+  saveEscluse(); saveRoute(); renderDayTabs(); renderDayList(selectedDay); updateBadges();
+}
+
 </script></body></html>
