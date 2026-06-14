@@ -661,6 +661,14 @@ input[type=number] { width: 62px; }
 .stato-chip.active-visitata { background: var(--green); color: #fff; border-color: var(--green); }
 .stato-chip.active-richiamare { background: var(--amber); color: #fff; border-color: var(--amber); }
 .stato-chip.active-da-visitare { background: var(--ink); color: #fff; border-color: var(--ink); }
+/* Colori persistenti quando active class è impostata */
+.stato-chip[data-stato="visitata"].active { background: var(--green) !important; color: #fff !important; border-color: var(--green) !important; font-weight:700; }
+.stato-chip[data-stato="assente"].active { background: var(--red) !important; color: #fff !important; border-color: var(--red) !important; font-weight:700; }
+.stato-chip[data-stato="richiamare"].active { background: var(--amber) !important; color: #fff !important; border-color: var(--amber) !important; font-weight:700; }
+.stato-chip[data-stato="da-visitare"].active { background: #374151 !important; color: #fff !important; border-color: #374151 !important; font-weight:700; }
+.prio-chip[data-prio="caldo"].active { background: var(--red) !important; color: #fff !important; border-color: var(--red) !important; font-weight:700; }
+.prio-chip[data-prio="tiepido"].active { background: var(--amber) !important; color: #fff !important; border-color: var(--amber) !important; font-weight:700; }
+.prio-chip[data-prio="freddo"].active { background: var(--blue) !important; color: #fff !important; border-color: var(--blue) !important; font-weight:700; }
 
 /* Priorità chips */
 .prio-chips { display: flex; gap: 8px; }
@@ -676,9 +684,9 @@ input[type=number] { width: 62px; }
   transition: all .15s;
   user-select: none;
 }
-.prio-chip.active-caldo { background: var(--red-light); border-color: var(--red); color: var(--red); }
-.prio-chip.active-tiepido { background: var(--amber-light); border-color: var(--amber); color: var(--amber); }
-.prio-chip.active-freddo { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
+.prio-chip.active-caldo { background: var(--red); border-color: var(--red); color: #fff; font-weight:700; }
+.prio-chip.active-tiepido { background: var(--amber); border-color: var(--amber); color: #fff; font-weight:700; }
+.prio-chip.active-freddo { background: var(--blue); border-color: var(--blue); color: #fff; font-weight:700; }
 
 /* Note textarea */
 .note-area {
@@ -954,7 +962,7 @@ button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: 
 /* Card esiti */
 .card-esiti { display:flex; gap:4px; margin-top:5px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
 .card-esiti::-webkit-scrollbar { display:none; }
-.btn-esito { border:none; border-radius:6px; padding:3px 8px; font-size:0.68rem; font-weight:700; cursor:pointer; transition:all .15s; }
+.btn-esito { border:none; border-radius:6px; padding:5px 10px; font-size:0.75rem; font-weight:700; cursor:pointer; transition:all .15s; }
 .btn-esito.visitata { background:var(--green-light); color:var(--green); }
 .btn-esito.assente { background:var(--red-light); color:var(--red); }
 .btn-esito.richiamo { background:var(--amber-light); color:var(--amber); }
@@ -962,10 +970,10 @@ button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: 
 .btn-esito.ordine { background:#e3f2fd; color:#1565c0; }
 .btn-esito { transition: transform .12s, box-shadow .12s; }
 .btn-esito:active { transform:scale(0.93); opacity:0.8; }
-.btn-esito.visitata.active-esito { background:var(--green); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--green); transform:scale(1.06); }
-.btn-esito.assente.active-esito { background:var(--red); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--red); transform:scale(1.06); }
-.btn-esito.richiamo.active-esito { background:var(--amber); color:#fff; font-weight:800; box-shadow:0 0 0 2.5px var(--amber); transform:scale(1.06); }
-.btn-esito.ordine.active-esito { background:#1565c0; color:#fff; font-weight:800; box-shadow:0 0 0 2.5px #1565c0; transform:scale(1.06); }
+.btn-esito.visitata.active-esito { background:var(--green); color:#fff; font-weight:800; font-size:0.78rem; box-shadow:0 0 0 2.5px var(--green); transform:scale(1.06); }
+.btn-esito.assente.active-esito { background:var(--red); color:#fff; font-weight:800; font-size:0.78rem; box-shadow:0 0 0 2.5px var(--red); transform:scale(1.06); }
+.btn-esito.richiamo.active-esito { background:var(--amber); color:#fff; font-weight:800; font-size:0.78rem; box-shadow:0 0 0 2.5px var(--amber); transform:scale(1.06); }
+.btn-esito.ordine.active-esito { background:#1565c0; color:#fff; font-weight:800; font-size:0.78rem; box-shadow:0 0 0 2.5px #1565c0; transform:scale(1.06); }
 
 /* Card stato visiva */
 .route-item.stato-visitata { border-left:4px solid var(--green); background:var(--green-light); }
@@ -1159,8 +1167,7 @@ button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: 
           <option value="MB">MB</option>
           <option value="LC">LC</option>
           <option value="SO">SO</option>
-          
-          
+          <option value="PF">Solo PF</option>
         </select>
         <span class="ctrl-label">Far./g</span>
         <input type="number" id="per-day" value="7" min="3" max="15" onchange="localStorage.setItem('farmarete_perday', this.value)">
@@ -1804,58 +1811,58 @@ const FARMACIE_RAW = [
   {n:"DOTT. BIGLIOLI SRL",a:"LARGO ALBERTO PEDRINI, 3",c:"23100",loc:"SONDRIO",p:"SO"},
   {n:"FARMAGORA' SONDRIO SRL",a:"PIAZZETTA PIETRO RUSCONI, 5",c:"23100",loc:"SONDRIO",p:"SO"},
   // ── PARAFARMACIE LC / SO / MB ──
-  {n:"MEDI-MARKET ITALIA SRL",a:"Via Italia 197",c:"20874",loc:"Busnago",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA CONAD MERATE",a:"Via Bergamo 19",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Villasanta",a:"Via T. Vecellio, 1",c:"20058",loc:"Villasanta",p:"MB",tipo:"parafarmacia"},
-  {n:"Iper Montebello Spa - Iper Busnago",a:"Via Italia, 197",c:"20874",loc:"Busnago",p:"MB",tipo:"parafarmacia"},
-  {n:"CURASI SRL",a:"Via Santi Cosma E Damiano 10",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
-  {n:"Pharma.Co srl",a:"Via San Vitale 4",c:"23032",loc:"Bormio",p:"SO",tipo:"parafarmacia"},
-  {n:"IPERAL CIVATE",a:"Via Papa Giovanni Xxiii 15",c:"23862",loc:"Civate",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia San Bartolomeo",a:"Via Tre Re 66",c:"20861",loc:"Brugherio",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA DOTT.SSA MONICA FAIFER",a:"Via Crosal, 57",c:"23030",loc:"Livigno",p:"SO",tipo:"parafarmacia"},
-  {n:"IPERAL CASTIONE ANDEVENNO",a:"Viale Bruno Tirelli, 149",c:"23012",loc:"Castione Andevenno",p:"SO",tipo:"parafarmacia"},
-  {n:"parafarmacia dott. branca",a:"Via Pace, 12",c:"20821",loc:"Meda",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA OSPEDALE MONZA",a:"Via Giambattista Pergolesi, 33",c:"20052",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA IL GIARDINO SRL",a:"Via Foscolo, 12",c:"20843",loc:"Verano Brianza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 27",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Conad Bernareggio",a:"Via Roma, Snc",c:"20881",loc:"Bernareggio",p:"MB",tipo:"parafarmacia"},
-  {n:"L'erboristeria di Emanuela dott.ssa Delucce",a:"Via Buonarroti, 15",c:"20881",loc:"Bernareggio",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA LECCO",a:"Via Roma, 26",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Conad",a:"Via Nazionale, 89",c:"23030",loc:"Villa Di Tirano",p:"SO",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Falcone E Borsellino, 6",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
-  {n:"G.M. PARAFARMA",a:"Via Lega Lombarda, 33",c:"20855",loc:"Lesmo",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia della Dott.ssa Frosi Maria Clotilde",a:"Via Alessandro Volta, 30",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"+Medical Monza",a:"Via Sant Andrea, 21",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA LA ROCCA",a:"Via Consoli Chiavennaschi, 23",c:"23022",loc:"Chiavenna",p:"SO",tipo:"parafarmacia"},
-  {n:"G.M. FARMA S.R.L.",a:"Via Lega Lombarda, 33",c:"20855",loc:"Lesmo",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Pastrengo, 111",c:"20814",loc:"Varedo",p:"MB",tipo:"parafarmacia"},
-  {n:"+Medical Monza Via Marsala",a:"Via Marsala/Via Solferino, Snc",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Valsassina",a:"Via Provinciale, 93",c:"23818",loc:"Pasturo",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Brembo",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Buonarroti",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Buozzi, 15",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Vittorio Emanuele",a:"Via Vittorio Emanuele, 44/B",c:"20871",loc:"Vimercate",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia del Lario di Salus Lario srl",a:"Via Statale",c:"23826",loc:"Mandello Del Lario",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 8",c:"23807",loc:"Merate",p:"LC",tipo:"parafarmacia"},
-  {n:"Iperfarma Monza 1",a:"Via Della Guerrina, 98",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA EMMEPI SRL",a:"Via Vallecetta, 1",c:"23032",loc:"Bormio",p:"SO",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA BRUGHERIO",a:"Viale Lombardia, 264",c:"20861",loc:"Brugherio",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA DOTT.SSA R. MARIANI",a:"Piazza 11 Febbraio, 11",c:"28046",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Via Via G. Giardino Ang. Via Valassina, Snc",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia & Erboristeria EmmeGi di D.ssa  Marina Geme",a:"Piazza Della Repubblica, 2",c:"23880",loc:"Casatenovo",p:"LC",tipo:"parafarmacia"},
-  {n:"umanvet parafarmacia sas di dott. paolo manetti & c.",a:"Via Kennedy, 1",c:"20811",loc:"Cesano Maderno",p:"MB",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA E'QUI CASATENOVO",a:"Via Casati, 28",c:"23880",loc:"Casatenovo",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia della Dida",a:"Piazza Manzoni, 12",c:"23848",loc:"Oggiono",p:"LC",tipo:"parafarmacia"},
-  {n:"PARAFARMACIA E'QUI CASTELLO DI BRIANZA",a:"Via Don G. Allamano, 1",c:"23884",loc:"Castello Di Brianza",p:"LC",tipo:"parafarmacia"},
-  {n:"Parafarmacia",a:"Viale Libertã , Snc",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"NEW PHARM  S.R.L.",a:"Via Tommaso Nani, 50",c:"23100",loc:"Sondrio",p:"SO",tipo:"parafarmacia"},
-  {n:"France's Sas",a:"Via Via Della Filanda, 14",c:"23900",loc:"Lecco",p:"LC",tipo:"parafarmacia"},
-  {n:"Medi-Market srl",a:"Via Italia, 39",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Prima srl",a:"Largo Bruno Salvadori, 3",c:"20851",loc:"Lissone",p:"MB",tipo:"parafarmacia"},
-  {n:"SFERI S.r.l.",a:"Via Bergamo 15",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"parafarmacia San Carlo",a:"Via Marsala 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"Parafarmacia Monguzzi",a:"Monza",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
-  {n:"lo speziale di dott. mario villa e c. snc",a:"Via Cavallotti 17",c:"20900",loc:"Monza",p:"MB",tipo:"parafarmacia"},
+  {n:"MEDI-MARKET ITALIA SRL",a:"Via Italia 197",c:"20874",loc:"BUSNAGO",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA CONAD MERATE",a:"Via Bergamo 19",c:"23807",loc:"MERATE",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Villasanta",a:"Via T. Vecellio, 1",c:"20058",loc:"VILLASANTA",p:"MB",tipo:"parafarmacia"},
+  {n:"Iper Montebello Spa - Iper Busnago",a:"Via Italia, 197",c:"20874",loc:"BUSNAGO",p:"MB",tipo:"parafarmacia"},
+  {n:"CURASI SRL",a:"Via Santi Cosma E Damiano 10",c:"20871",loc:"VIMERCATE",p:"MB",tipo:"parafarmacia"},
+  {n:"Pharma.Co srl",a:"Via San Vitale 4",c:"23032",loc:"BORMIO",p:"SO",tipo:"parafarmacia"},
+  {n:"IPERAL CIVATE",a:"Via Papa Giovanni Xxiii 15",c:"23862",loc:"CIVATE",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia San Bartolomeo",a:"Via Tre Re 66",c:"20861",loc:"BRUGHERIO",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA DOTT.SSA MONICA FAIFER",a:"Via Crosal, 57",c:"23030",loc:"LIVIGNO",p:"SO",tipo:"parafarmacia"},
+  {n:"IPERAL CASTIONE ANDEVENNO",a:"Viale Bruno Tirelli, 149",c:"23012",loc:"CASTIONE ANDEVENNO",p:"SO",tipo:"parafarmacia"},
+  {n:"parafarmacia dott. branca",a:"Via Pace, 12",c:"20821",loc:"MEDA",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA OSPEDALE MONZA",a:"Via Giambattista Pergolesi, 33",c:"20052",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA IL GIARDINO SRL",a:"Via Foscolo, 12",c:"20843",loc:"VERANO BRIANZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 27",c:"23807",loc:"MERATE",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Conad Bernareggio",a:"Via Roma, Snc",c:"20881",loc:"BERNAREGGIO",p:"MB",tipo:"parafarmacia"},
+  {n:"L'erboristeria di Emanuela dott.ssa Delucce",a:"Via Buonarroti, 15",c:"20881",loc:"BERNAREGGIO",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA LECCO",a:"Via Roma, 26",c:"23900",loc:"LECCO",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Conad",a:"Via Nazionale, 89",c:"23030",loc:"VILLA DI TIRANO",p:"SO",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Falcone E Borsellino, 6",c:"20871",loc:"VIMERCATE",p:"MB",tipo:"parafarmacia"},
+  {n:"G.M. PARAFARMA",a:"Via Lega Lombarda, 33",c:"20855",loc:"LESMO",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia della Dott.ssa Frosi Maria Clotilde",a:"Via Alessandro Volta, 30",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"+Medical Monza",a:"Via Sant Andrea, 21",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA LA ROCCA",a:"Via Consoli Chiavennaschi, 23",c:"23022",loc:"CHIAVENNA",p:"SO",tipo:"parafarmacia"},
+  {n:"G.M. FARMA S.R.L.",a:"Via Lega Lombarda, 33",c:"20855",loc:"LESMO",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Pastrengo, 111",c:"20814",loc:"VAREDO",p:"MB",tipo:"parafarmacia"},
+  {n:"+Medical Monza Via Marsala",a:"Via Marsala/Via Solferino, Snc",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia Valsassina",a:"Via Provinciale, 93",c:"23818",loc:"PASTURO",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Brembo",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Buonarroti",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Buozzi, 15",c:"23900",loc:"LECCO",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Vittorio Emanuele",a:"Via Vittorio Emanuele, 44/B",c:"20871",loc:"VIMERCATE",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia del Lario di Salus Lario srl",a:"Via Statale",c:"23826",loc:"MANDELLO DEL LARIO",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia Prinetti",a:"Piazza Prinetti, 8",c:"23807",loc:"MERATE",p:"LC",tipo:"parafarmacia"},
+  {n:"Iperfarma Monza 1",a:"Via Della Guerrina, 98",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA EMMEPI SRL",a:"Via Vallecetta, 1",c:"23032",loc:"BORMIO",p:"SO",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA BRUGHERIO",a:"Viale Lombardia, 264",c:"20861",loc:"BRUGHERIO",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA DOTT.SSA R. MARIANI",a:"Piazza 11 Febbraio, 11",c:"28046",loc:"LISSONE",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Via Via G. Giardino Ang. Via Valassina, Snc",c:"20851",loc:"LISSONE",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia & Erboristeria EmmeGi di D.ssa  Marina Geme",a:"Piazza Della Repubblica, 2",c:"23880",loc:"CASATENOVO",p:"LC",tipo:"parafarmacia"},
+  {n:"umanvet parafarmacia sas di dott. paolo manetti & c.",a:"Via Kennedy, 1",c:"20811",loc:"CESANO MADERNO",p:"MB",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA E'QUI CASATENOVO",a:"Via Casati, 28",c:"23880",loc:"CASATENOVO",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia della Dida",a:"Piazza Manzoni, 12",c:"23848",loc:"OGGIONO",p:"LC",tipo:"parafarmacia"},
+  {n:"PARAFARMACIA E'QUI CASTELLO DI BRIANZA",a:"Via Don G. Allamano, 1",c:"23884",loc:"CASTELLO DI BRIANZA",p:"LC",tipo:"parafarmacia"},
+  {n:"Parafarmacia",a:"Viale Libertã , Snc",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"NEW PHARM  S.R.L.",a:"Via Tommaso Nani, 50",c:"23100",loc:"SONDRIO",p:"SO",tipo:"parafarmacia"},
+  {n:"France's Sas",a:"Via Via Della Filanda, 14",c:"23900",loc:"LECCO",p:"LC",tipo:"parafarmacia"},
+  {n:"Medi-Market srl",a:"Via Italia, 39",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Prima srl",a:"Largo Bruno Salvadori, 3",c:"20851",loc:"LISSONE",p:"MB",tipo:"parafarmacia"},
+  {n:"SFERI S.r.l.",a:"Via Bergamo 15",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"parafarmacia San Carlo",a:"Via Marsala 17",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"Parafarmacia Monguzzi",a:"Monza",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
+  {n:"lo speziale di dott. mario villa e c. snc",a:"Via Cavallotti 17",c:"20900",loc:"MONZA",p:"MB",tipo:"parafarmacia"},
 ];
 
 // Genera ID univoci
@@ -2550,7 +2557,8 @@ function buildRoute() {
 
   // Pool base: senza appuntamenti futuri, senza visitati/assenti recenti
   const pool = FARMACIE.filter(f => {
-    if (prov !== 'ALL' && f.p !== prov) return false;
+    if (prov === 'PF' && f.tipo !== 'parafarmacia') return false;
+    if (prov !== 'ALL' && prov !== 'PF' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
     const fd = _getFD(f.id);
     if (fd.stato === 'richiamare') return false;
@@ -3406,15 +3414,13 @@ function quickOrdineModal() {
 function navigaVerso(indirizzo, preview=false) {
   const dest = encodeURIComponent(indirizzo);
   const url = preview
-    ? `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`
+    ? `https://www.google.com/maps/search/?api=1&query=${dest}`
     : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving&dir_action=navigate`;
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  // Su Android PWA window.open può essere bloccato — usa location.href come fallback
+  const w = window.open(url, '_blank');
+  if (!w || w.closed || typeof w.closed === 'undefined') {
+    window.location.href = url;
+  }
 }
 
 function apriProssimaFarmacia(dayIdx) {
@@ -3726,6 +3732,7 @@ function renderFarmacie() {
   let pool = FARMACIE;
   if (searchQuery) pool = pool.filter(f => f.n.toLowerCase().includes(searchQuery) || f.loc.toLowerCase().includes(searchQuery));
   if (currentFilter === 'MB'||currentFilter==='LC'||currentFilter==='SO') pool = pool.filter(f => f.p===currentFilter);
+  else if (currentFilter==='PF') pool = pool.filter(f => f.tipo==='parafarmacia');
   else if (currentFilter==='caldo'||currentFilter==='tiepido'||currentFilter==='freddo') pool = pool.filter(f => (data[String(f.id)]||{}).priorita===currentFilter);
   else if (currentFilter==='visitata') pool = pool.filter(f => (data[String(f.id)]||{}).stato==='visitata');
   else if (currentFilter==='richiamare') pool = pool.filter(f => (data[String(f.id)]||{}).stato==='richiamare');
@@ -4470,6 +4477,7 @@ window.addEventListener('load', () => {
   if (loadSavedRoute()) {
     renderDayTabs();
     renderDayList(selectedDay);
+    renderApptStrip();
   }
   renderFarmacie();
   renderScadenze();
