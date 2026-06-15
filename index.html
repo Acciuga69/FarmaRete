@@ -529,6 +529,7 @@ input[type=number] { width: 62px; }
 .filter-chip[data-filter="escluse"].active { background:rgba(185,28,28,0.15); border-color:#b91c1c; color:#b91c1c; box-shadow:0 2px 8px rgba(185,28,28,0.2); transform:scale(1.06); }
 .filter-chip[data-filter="top"].active    { background:#b45309; border-color:#b45309; color:#fff; box-shadow:0 2px 8px rgba(180,83,9,0.35); transform:scale(1.06); }
 .filter-chip[data-filter="scaduta"].active { background:#b91c1c; border-color:#b91c1c; color:#fff; box-shadow:0 2px 8px rgba(185,28,28,0.35); transform:scale(1.06); }
+.filter-chip[data-filter="pf"].active { background:#7c3aed; border-color:#7c3aed; color:#fff; box-shadow:0 2px 8px rgba(124,58,237,0.35); transform:scale(1.06); }
 .filter-chip[data-filter="MB"].active, .filter-chip[data-filter="LC"].active, .filter-chip[data-filter="SO"].active { background:#374151; border-color:#374151; color:#fff; box-shadow:0 2px 8px rgba(55,65,81,0.35); transform:scale(1.06); }
 
 .farmacie-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -1276,6 +1277,7 @@ button:active, .btn:active { transform: scale(0.94); opacity: 0.82; transition: 
       <div class="filter-chip" data-filter="MB" onclick="setFilter('MB',this)">MB</div>
       <div class="filter-chip" data-filter="LC" onclick="setFilter('LC',this)">LC</div>
       <div class="filter-chip" data-filter="SO" onclick="setFilter('SO',this)">SO</div>
+      <div class="filter-chip" data-filter="pf" onclick="setFilter('pf',this)" style="background:#ede9fe;color:#7c3aed;border-color:#7c3aed;">⚕ PF</div>
       <div class="filter-chip fc-caldo" data-filter="caldo" onclick="setFilter('caldo',this)">🔴 Caldo</div>
       <div class="filter-chip fc-tiepido" data-filter="tiepido" onclick="setFilter('tiepido',this)">🟡 Tiepido</div>
       <div class="filter-chip fc-freddo" data-filter="freddo" onclick="setFilter('freddo',this)">🔵 Freddo</div>
@@ -3732,7 +3734,7 @@ function renderFarmacie() {
   let pool = FARMACIE;
   if (searchQuery) pool = pool.filter(f => f.n.toLowerCase().includes(searchQuery) || f.loc.toLowerCase().includes(searchQuery));
   if (currentFilter === 'MB'||currentFilter==='LC'||currentFilter==='SO') pool = pool.filter(f => f.p===currentFilter);
-  else if (currentFilter==='PF') pool = pool.filter(f => f.tipo==='parafarmacia');
+  else if (currentFilter==='pf'||currentFilter==='PF') pool = pool.filter(f => f.tipo==='parafarmacia');
   else if (currentFilter==='caldo'||currentFilter==='tiepido'||currentFilter==='freddo') pool = pool.filter(f => (data[String(f.id)]||{}).priorita===currentFilter);
   else if (currentFilter==='visitata') pool = pool.filter(f => (data[String(f.id)]||{}).stato==='visitata');
   else if (currentFilter==='richiamare') pool = pool.filter(f => (data[String(f.id)]||{}).stato==='richiamare');
@@ -4038,9 +4040,6 @@ function saveModal() {
       delete escluseData[key];
     }
     saveEscluse();
-  }
-  if (update.dataAppuntamento !== undefined || update.stato || update.frequenza || update.isTop !== undefined) {
-    showRigeneraBanner('💾 Salvato — premi 🔄 per aggiornare il percorso');
   }
   // Aggiorna anche la pagina corrente
   const activePage = document.querySelector('.page.active');
