@@ -2690,31 +2690,32 @@ function ricalcolaGiornoCorrente() {
 }
 
 function ricalcolaGiorno(dayIdx) {
-  // Ricalcola solo il giorno selezionato mantenendo gli altri invariati
   const todayYMD = toYMD(new Date());
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
+  const perDay = parseInt(document.getElementById('per-day').value) || 7;
+  const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
 
-  // Raccogli ID usati dagli altri giorni (non dayIdx)
+  // Zona scelta dall'utente (salvata in window._ricalcolaZona) o default per giorno
+  const ZONE_BY_DAY = [['MB'],['SO'],['MB'],['LC'],['MB','LC']];
+  const zonaDelGiorno = window._ricalcolaZona || ZONE_BY_DAY[dayIdx % 5] || ['MB','LC','SO'];
+
+  // ID usati negli altri giorni
   const usedByOthers = new Set();
   currentRoute.forEach((day, i) => {
     if (i !== dayIdx) day.forEach(f => usedByOthers.add(String(f.id)));
   });
 
-  // Pool disponibile per quel giorno
-  const dayStr = routeDates[dayIdx] ? toYMD(routeDates[dayIdx]) : '';
-  const perDay = parseInt(document.getElementById('per-day').value) || 7;
-
-  // Appuntamenti del giorno (fissi)
+  // Appuntamenti fissi del giorno
   const pinned = FARMACIE.filter(f => {
     const fd = _getFD(f.id);
     return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
   }).sort((a,b) => (_getFD(a.id).oraAppuntamento||'23:59').localeCompare(_getFD(b.id).oraAppuntamento||'23:59'));
-
   const pinnedIds = new Set(pinned.map(f => String(f.id)));
 
-  // Pool libero
+  // Pool filtrato per zona del giorno
   const pool = FARMACIE.filter(f => {
+    if (!zonaDelGiorno.includes(f.p)) return false;
     if (usedByOthers.has(String(f.id))) return false;
     if (pinnedIds.has(String(f.id))) return false;
     if (escluseIds.has(String(f.id))) return false;
@@ -2728,7 +2729,6 @@ function ricalcolaGiorno(dayIdx) {
     return true;
   });
 
-  // Funzione priorità locale
   const pri = (f) => {
     const fd = _getFD(f.id);
     if (fd.stato === 'richiamare') return 1;
@@ -2738,45 +2738,98 @@ function ricalcolaGiorno(dayIdx) {
     return 5;
   };
 
-  // Costruisci nuovo giorno con nearest-neighbor
-  const newDay = [...pinned];
-  const usedDay = new Set(pinned.map(f => String(f.id)));
-  let currentLoc = pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label;
-  const remaining = [...pool];
-
-  // Mischia leggermente per dare un'alternativa (Fisher-Yates)
-  for (let i = remaining.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-  }
-
-  while (newDay.length < perDay && remaining.length > 0) {
-    let chosen = null, chosenIdx = -1;
-    for (let p = 1; p <= 5; p++) {
-      const cands = remaining
-        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
-        .filter(x => pri(x.f)===p && x.t<=MAX_TRAVEL_MIN);
-      if (cands.length > 0) {
-        cands.sort((a,b) => a.t-b.t);
-        chosen = cands[0].f; chosenIdx = cands[0].i; break;
+  // Genera un percorso con nearest-neighbor
+  function buildAlt(poolInput, startLoc) {
+    const result = [...pinned];
+    let currentLoc = startLoc || (pinned.length > 0 ? pinned[pinned.length-1].loc : startPoint.label);
+    const rem = [...poolInput];
+    while (result.length < perDay && rem.length > 0) {
+      let chosen = null, chosenIdx = -1;
+      for (let p = 1; p <= 5; p++) {
+        const cands = rem.map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
+          .filter(x => pri(x.f)===p).sort((a,b) => a.t-b.t);
+        if (cands.length) { chosen=cands[0].f; chosenIdx=cands[0].i; break; }
       }
+      if (!chosen) break;
+      rem.splice(chosenIdx,1);
+      result.push(chosen);
+      currentLoc = chosen.loc;
     }
-    if (!chosen) {
-      const byPri = remaining
-        .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
-        .sort((a,b) => pri(a.f)-pri(b.f) || a.t-b.t);
-      if (byPri.length) { chosen=byPri[0].f; chosenIdx=byPri[0].i; }
-    }
-    if (!chosen) break;
-    remaining.splice(chosenIdx,1);
-    newDay.push(chosen);
-    usedDay.add(String(chosen.id));
-    currentLoc = chosen.loc;
+    return result;
   }
 
-  // Aggiorna solo quel giorno in tutti i percorsi
-  allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = newDay; });
-  currentRoute[dayIdx] = newDay;
+  // Alternativa 1: distanza minima (nearest-neighbor puro)
+  const alt1 = buildAlt([...pool]);
+
+  // Alternativa 2: priorità prima (top+scaduti in testa)
+  const poolPri = [...pool].sort((a,b) => pri(a)-pri(b));
+  const alt2 = buildAlt(poolPri);
+
+  // Alternativa 3: punto di partenza diverso (il primo appuntamento o farmacia più lontana)
+  const startAlt3 = pool.length > 0 ? pool[Math.floor(pool.length * 0.6)].loc : startPoint.label;
+  const alt3 = buildAlt([...pool], startAlt3);
+
+  // Mostra pannello scelta alternative
+  const existing = document.getElementById('ricalcola-panel');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'ricalcola-panel';
+  panel.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:8px 0;';
+
+  const zona = zonaDelGiorno.join('+');
+  const selMB = zonaDelGiorno.includes('MB') && zonaDelGiorno.length===1 ? 'background:var(--green);color:#fff;border-color:var(--green);font-weight:700;' : '';
+  const selSO = zonaDelGiorno.includes('SO') && zonaDelGiorno.length===1 ? 'background:var(--green);color:#fff;border-color:var(--green);font-weight:700;' : '';
+  const selLC = zonaDelGiorno.includes('LC') && zonaDelGiorno.length===1 ? 'background:var(--green);color:#fff;border-color:var(--green);font-weight:700;' : '';
+  const selAll = zonaDelGiorno.length>1 ? 'background:var(--green);color:#fff;border-color:var(--green);font-weight:700;' : '';
+  panel.innerHTML = `
+    <div style="font-size:0.78rem;font-weight:700;color:var(--ink2);margin-bottom:8px;">
+      🔄 Ricalcola giorno — scegli zona
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button onclick="cambiaZonaRicalcola(${dayIdx},['MB'])" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;cursor:pointer;${selMB}">🏙 MB</button>
+      <button onclick="cambiaZonaRicalcola(${dayIdx},['LC'])" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;cursor:pointer;${selLC}">⛰ LC</button>
+      <button onclick="cambiaZonaRicalcola(${dayIdx},['SO'])" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;cursor:pointer;${selSO}">🏔 SO</button>
+      <button onclick="cambiaZonaRicalcola(${dayIdx},['MB','LC','SO'])" style="flex:1;padding:7px 4px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;cursor:pointer;${selAll}">🌍 Tutte</button>
+    </div>
+    <div style="font-size:0.72rem;color:var(--ink3);margin-bottom:8px;">Zona attiva: <strong>${zona}</strong> · ${pool.length} farmacie disponibili</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <button onclick="applicaAlt(${dayIdx}, 0)" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;text-align:left;">
+        🗺 Percorso 1 — Distanza minima · ${alt1.length} fermate
+      </button>
+      <button onclick="applicaAlt(${dayIdx}, 1)" style="background:var(--blue-light);color:var(--blue);border:1px solid #b3d4f5;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;text-align:left;">
+        ⭐ Percorso 2 — Top & scaduti prima · ${alt2.length} fermate
+      </button>
+      <button onclick="applicaAlt(${dayIdx}, 2)" style="background:var(--amber-light);color:#92400e;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;text-align:left;">
+        🔀 Percorso 3 — Variante geografica · ${alt3.length} fermate
+      </button>
+      <button onclick="document.getElementById('ricalcola-panel').remove();window._ricalcolaZona=null;" style="background:none;border:1px solid var(--border);border-radius:8px;padding:6px;font-size:0.75rem;cursor:pointer;color:var(--ink3);">
+        ✕ Annulla
+      </button>
+    </div>
+  `;
+
+  // Salva le alternative per applicarle
+  window._ricalcolaAlts = [alt1, alt2, alt3];
+
+  // Inserisci il pannello in cima alla route-list
+  const routeList = document.getElementById('route-list');
+  routeList.insertBefore(panel, routeList.firstChild);
+}
+
+function cambiaZonaRicalcola(dayIdx, zona) {
+  window._ricalcolaZona = zona;
+  ricalcolaGiorno(dayIdx);
+}
+
+function applicaAlt(dayIdx, altIdx) {
+  const alt = (window._ricalcolaAlts || [])[altIdx];
+  if (!alt) return;
+  allPercorsi.forEach(perc => { if (perc[dayIdx]) perc[dayIdx] = alt; });
+  currentRoute[dayIdx] = alt;
+  const panel = document.getElementById('ricalcola-panel');
+  if (panel) panel.remove();
+  window._ricalcolaZona = null;
   renderDayTabs();
   renderDayList(dayIdx);
 }
