@@ -1136,6 +1136,7 @@ button, .filter-chip, .day-btn, .nav-tab, .stato-chip, .prio-chip {
         <div class="route-list-header">
           <span id="route-list-label">Genera un percorso</span>
           <span id="route-list-count"></span>
+          <button id="ricalcola-day-btn" onclick="ricalcolaGiornoCorrente()" style="display:none;font-size:0.75rem;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;white-space:nowrap;">🔄 Ricalcola giorno</button>
         </div>
         <div class="route-list scroll" id="route-list">
           <div class="empty-state"><div class="icon">🗺️</div><h4>Nessun percorso</h4><p>Configura i parametri e premi "Genera percorsi".</p></div>
@@ -2531,8 +2532,10 @@ function renderDayList(dayIdx) {
 
   document.getElementById('map-toolbar-info').innerHTML = `
     📌 <strong>${startPoint.label}</strong> · Giorno ${dayIdx+1} · ${day.length} fermate
-    &nbsp;<button onclick="ricalcolaGiorno(${dayIdx})" style="font-size:0.72rem;padding:2px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;">🔄 Ricalcola</button>
   `;
+  // Mostra bottone Ricalcola giorno nell'header lista
+  const rcBtn = document.getElementById('ricalcola-day-btn');
+  if (rcBtn) rcBtn.style.display = 'inline-block';
   showMapsPanel(dayIdx);
 }
 
@@ -2627,6 +2630,10 @@ function ripristinaFarmacia(id) {
   saveEscluse();
   buildRoute();
 }
+function ricalcolaGiornoCorrente() {
+  ricalcolaGiorno(selectedDay);
+}
+
 function ricalcolaGiorno(dayIdx) {
   // Ricalcola solo il giorno selezionato mantenendo gli altri invariati
   const todayYMD = toYMD(new Date());
@@ -2724,8 +2731,12 @@ function renderEscluse() {
   const list = document.getElementById('escluse-list');
   const arrow = document.getElementById('escluse-arrow');
   document.getElementById('escluse-count').textContent = escluseIds.size;
-  if (escluseIds.size === 0) { panel.style.display='none'; return; }
   panel.style.display = 'block';
+  if (escluseIds.size === 0) {
+    list.innerHTML = '<div style="font-size:0.75rem;color:var(--ink3);padding:4px 0;">Nessuna farmacia esclusa.</div>';
+    if (arrow) arrow.textContent = '▼';
+    return;
+  }
   // Mantieni stato aperto/chiuso attuale, di default chiuso
   const isOpen = list.style.display === 'flex';
   if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
