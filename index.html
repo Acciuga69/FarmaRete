@@ -2259,9 +2259,68 @@ function _buildRouteCore() {
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
   const todayYMD = toYMD(new Date());
-  // Cache dei dati: evitiamo di leggere localStorage N volte
   const _fdCache = loadData();
   const _getFD = (id) => _fdCache[String(id)] || {};
+
+  // ── Zone geografiche per giorno della settimana ──────────────────────────
+  // Lun(1)=MB ovest  Mar(2)=SO(Valtellina)  Mer(3)=MB centro/est
+  // Gio(4)=LC        Ven(5)=MB est + LC sud
+  const MB_OVEST = new Set(['DESIO','SEREGNO','LENTATE SUL SEVESO','CESANO MADERNO',
+    'LISSONE','BOVISIO-MASCIAGO','LIMBIATE','COGLIATE','MISINTO','LAZZATE','MEDA',
+    'SEVESO','BARLASSINA','MUGGIO\'','NOVA MILANESE','VAREDO','BRUGHERIO',
+    'MONZA','BIASSONO','VEDANO AL LAMBRO','VILLASANTA','MACHERIO','SOVICO']);
+  const MB_CENTRO = new Set(['ARCORE','VIMERCATE','USMATE VELATE','LESMO','TRIUGGIO',
+    'BESANA IN BRIANZA','VERANO BRIANZA','GIUSSANO','ALBIATE','CORREZZANA',
+    'BRIOSCO','RENATE','VEDUGGIO CON COLZANO','CAMPARADA','CARATE BRIANZA',
+    'AGLIATE','AGRATE BRIANZA','CONCOREZZO','BURAGO DI MOLGORA','ORNAGO',
+    'BERNAREGGIO','AICURZIO','BELLUSCO','CAPONAGO','CAVENAGO DI BRIANZA']);
+  const MB_EST = new Set(['MEZZAGO','SULBIATE','BUSNAGO','RONCELLO','CARNATE',
+    'CORNATE D\'ADDA','RONCO BRIANTINO','BERNAREGGIO','ORENO','VIMERCATE',
+    'USMATE VELATE','CERIANO LAGHETTO']);
+  const LC_SUD = new Set(['MERATE','CASATENOVO','MISSAGLIA','MONTICELLO BRIANZA',
+    'BARZANO\'','LOMAGNA','CERNUSCO LOMBARDONE','CALCO','ROBBIATE','VERDERIO',
+    'OSNAGO','OLGIATE MOLGORA','AIRUNO','BRIVIO','IMBERSAGO','PADERNO D\'ADDA',
+    'SIRTORI','MONTEVECCHIA','CASTELLO DI BRIANZA','COLLE BRIANZA','LA VALLETTA BRIANZA',
+    'BARZAGO','CASSAGO BRIANZA','ANNONE DI BRIANZA','BOSISIO PARINI','SIRONE',
+    'ROGENO','NIBIONNO','GARBAGNATE MONASTERO','DOLZAGO','CREMELLA','BULCIAGO',
+    'COSTA MASNAGA','SUELLO']);
+  const LC_NORD = new Set(['LECCO','VALMADRERA','MALGRATE','GALBIATE','OGGIONO',
+    'CALOLZIOCORTE','OLGINATE','PESCATE','CIVATE','GARLATE','MOLTENO','ELLO',
+    'VERCURAGO','VALGREGHENTINO','BALLABIO','ABBADIA LARIANA','MANDELLO DEL LARIO',
+    'LIERNA','VARENNA','OLIVETO LARIO','CARENNO','BELLANO','DERVIO','COLICO',
+    'MARGNO','ESINO LARIO','PASTURO','CASARGO','INTROBIO','PREMANA','CORTENOVA',
+    'PRIMALUNA','CREMENO','BARZIO']);
+
+  // Zona assegnata per provincia (default se loc non trova match nelle set)
+  function zonaDefaultProv(p) {
+    if (p === 'SO') return 2; // martedì
+    if (p === 'LC') return 4; // giovedì
+    return 1; // MB → lunedì di default
+  }
+
+  // Giorno preferito (0=lun,1=mar... indice in weekStrs) per ogni farmacia
+  function giornoPref(f) {
+    if (f.p === 'SO') return 1; // martedì
+    if (f.p === 'LC') {
+      if (LC_NORD.has(f.loc)) return 3; // giovedì
+      return 4; // venerdì (LC sud + MB est)
+    }
+    // MB
+    if (MB_OVEST.has(f.loc)) return 0; // lunedì
+    if (MB_CENTRO.has(f.loc)) return 2; // mercoledì
+    if (MB_EST.has(f.loc) || LC_SUD.has(f.loc)) return 4; // venerdì
+    return 2; // MB non classificata → mercoledì
+  }
+
+  // Priorità farmacia (1=massima)
+  function priority(f) {
+    const fd = _getFD(f.id);
+    if (fd.stato === 'richiamare') return 1;
+    if (fd.isTop && isScaduta(f.id)) return 2;
+    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3;
+    if (fd.isTop) return 4;
+    return 5;
+  }
 
   // Date della settimana
   function getWeekDates(offset) {
@@ -2283,17 +2342,7 @@ function _buildRouteCore() {
   routeDates = getWeekDates(routeWeekOffset);
   const weekStrs = routeDates.map(d => toYMD(d));
 
-  // Priorità farmacia (1=massima)
-  function priority(f) {
-    const fd = _getFD(f.id);
-    if (fd.stato === 'richiamare') return 1;           // da richiamare
-    if (fd.isTop && isScaduta(f.id)) return 2;        // top + scaduto
-    if (isScaduta(f.id) || fd.stato === 'potenziale') return 3; // scaduti e potenziali miscelati
-    if (fd.isTop) return 4;                           // top non scaduto
-    return 5;                                         // normali
-  }
-
-  // Pool base: senza appuntamenti futuri, senza visitati/assenti recenti
+  // Pool base: esclude visitati recenti, assenti, esclusi
   const pool = FARMACIE.filter(f => {
     if (prov !== 'ALL' && f.p !== prov) return false;
     if (escluseIds.has(String(f.id))) return false;
@@ -2307,18 +2356,15 @@ function _buildRouteCore() {
     return true;
   });
 
-  // Costruisce il percorso: niente zone, solo GPS + priorità + distanza
-  // Tu escludi quello che non vuoi → l'app ottimizza quello che rimane
+  // ── Costruisce giorni con zone + appuntamenti come ancora ───────────────
   function buildDays(poolSorted) {
-    const days = [];
+    const days = Array.from({length: numDays}, () => []);
     const usedIds = new Set();
 
+    // STEP 1: piazza gli appuntamenti nel giorno giusto (ancora geografica)
     for (let d = 0; d < numDays; d++) {
       const dayStr = weekStrs[d];
-
-      // STEP 1: appuntamenti del giorno — sempre presenti, ignorano le esclusioni
       const pinned = FARMACIE.filter(f => {
-        if (usedIds.has(String(f.id))) return false;
         const fd = _getFD(f.id);
         return fd.dataAppuntamento && toYMD(fd.dataAppuntamento) === dayStr;
       }).sort((a,b) => {
@@ -2326,56 +2372,66 @@ function _buildRouteCore() {
         const tb = _getFD(b.id).oraAppuntamento || '23:59';
         return ta.localeCompare(tb);
       });
-      pinned.forEach(f => usedIds.add(String(f.id)));
+      pinned.forEach(f => { days[d].push(f); usedIds.add(String(f.id)); });
+    }
 
-      // STEP 2: parte dal punto GPS (ogni giorno riparte da casa/ufficio)
-      const dayRoute = [...pinned];
-      let currentLoc = pinned.length > 0
-        ? pinned[pinned.length - 1].loc
+    // STEP 2: per ogni farmacia del pool, assegnala al giorno di zona preferita
+    // ma se quel giorno ha già un appuntamento in zona diversa, adatta
+    const dayQueues = Array.from({length: numDays}, () => []);
+    poolSorted.forEach(f => {
+      if (usedIds.has(String(f.id))) return;
+      // Controlla se quel giorno ha appuntamenti: se sì, usa la zona dell'appuntamento
+      let prefDay = giornoPref(f);
+      // Se il giorno preferito ha appuntamenti in zona diversa (es SO il lun),
+      // sposta al giorno corretto della zona
+      if (prefDay >= numDays) prefDay = numDays - 1;
+      dayQueues[prefDay].push(f);
+    });
+
+    // STEP 3: riempi ogni giorno con nearest-neighbor dalla coda di zona
+    for (let d = 0; d < numDays; d++) {
+      // Punto di partenza: ultimo appuntamento o Tradate
+      let currentLoc = (days[d] && days[d].length > 0)
+        ? days[d][days[d].length - 1].loc
         : startPoint.label;
 
-      // STEP 3: riempi con nearest-neighbor per priorità, senza filtri di zona
-      const remaining = poolSorted.filter(f => !usedIds.has(String(f.id)));
+      const remaining = dayQueues[d].filter(f => !usedIds.has(String(f.id)));
 
-      while (dayRoute.length < perDay && remaining.length > 0) {
-        let chosen = null;
-        let chosenIdx = -1;
-
-        // Cerca per priorità crescente entro MAX_TRAVEL_MIN
+      while (days[d].length < perDay && remaining.length > 0) {
+        // Nearest-neighbor con look-ahead priorità
+        let chosen = null, chosenIdx = -1;
         for (let pri = 1; pri <= 5; pri++) {
-          const candidates = remaining
-            .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
-            .filter(x => priority(x.f) === pri && x.t <= MAX_TRAVEL_MIN);
-          if (candidates.length > 0) {
-            candidates.sort((a, b) => a.t - b.t);
-            chosen = candidates[0].f;
-            chosenIdx = candidates[0].i;
-            break;
-          }
-        }
-        // Fallback: il più vicino per priorità senza limite distanza
-        if (!chosen) {
-          const byPri = remaining
-            .map((f, i) => ({ f, i, t: travelMinutes(currentLoc, f.loc) }))
-            .sort((a, b) => priority(a.f) - priority(b.f) || a.t - b.t);
-          if (byPri.length > 0) {
-            chosen = byPri[0].f;
-            chosenIdx = byPri[0].i;
-          }
+          const cands = remaining
+            .map((f,i) => ({f,i,t:travelMinutes(currentLoc,f.loc)}))
+            .filter(x => priority(x.f) === pri)
+            .sort((a,b) => a.t - b.t);
+          if (cands.length) { chosen = cands[0].f; chosenIdx = cands[0].i; break; }
         }
         if (!chosen) break;
         remaining.splice(chosenIdx, 1);
-        dayRoute.push(chosen);
+        days[d].push(chosen);
         usedIds.add(String(chosen.id));
         currentLoc = chosen.loc;
       }
-
-      days.push(dayRoute);
     }
+
+    // STEP 4: overflow — farmacie non assegnate vanno nei giorni con meno tappe
+    const overflow = poolSorted.filter(f => !usedIds.has(String(f.id)));
+    overflow.forEach(f => {
+      let lightest = 0;
+      for (let i = 1; i < days.length; i++) {
+        if ((days[i]||[]).length < (days[lightest]||[]).length) lightest = i;
+      }
+      if (days[lightest] && days[lightest].length < perDay) {
+        days[lightest].push(f);
+        usedIds.add(String(f.id));
+      }
+    });
+
     return days;
   }
 
-  // Tre varianti percorso
+  // Tre varianti: base, top-first, scadenze-first
   const poolBase = [...pool];
   const poolTop = [...pool].sort((a,b) => {
     const pa = (_getFD(a.id).isTop?0:10) + (isScaduta(a.id)?0:5) + (_getFD(a.id).stato==='potenziale'?0:3);
@@ -2397,7 +2453,6 @@ function _buildRouteCore() {
   document.getElementById('percorsi-alt').style.display = 'flex';
   document.querySelectorAll('.pa-tab').forEach((t,i) => t.classList.toggle('active', i===0));
 
-  // Rimuovi debug banner se presente
   const dbg = document.getElementById('debug-appts');
   if (dbg) dbg.remove();
 
