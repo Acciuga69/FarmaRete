@@ -1774,12 +1774,14 @@ function showPage(name, tab) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   if (tab) tab.classList.add('active');
-  if (name === 'dashboard') refreshDashboard();
-  if (name === 'percorso') { if (currentRoute.length) renderDayList(selectedDay); }
   if (name !== 'farmacie') { searchQuery = ''; const i = document.getElementById('farmacie-search-input'); if(i) i.value=''; }
-  if (name === 'farmacie') renderFarmacie();
-  if (name === 'scadenze') renderScadenze();
-  if (name === 'richiami') renderRichiami();
+  requestAnimationFrame(() => {
+    if (name === 'dashboard') refreshDashboard();
+    if (name === 'percorso') { if (currentRoute.length) renderDayList(selectedDay); }
+    if (name === 'farmacie') renderFarmacie();
+    if (name === 'scadenze') renderScadenze();
+    if (name === 'richiami') renderRichiami();
+  });
 }
 
 // ══════════════════════════════════════════════
@@ -2245,6 +2247,13 @@ function toYMD(val) {
 }
 
 function buildRoute() {
+  // Mostra subito feedback visivo prima del calcolo pesante
+  const btn = document.querySelector('button[onclick="buildRoute()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Calcolo...'; }
+  setTimeout(() => _buildRouteCore(), 50);
+}
+function _buildRouteCore() {
+  const btn = document.querySelector('button[onclick="buildRoute()"]');
   const prov = document.getElementById('prov-filter').value;
   const perDay = parseInt(document.getElementById('per-day').value) || 7;
   const numDays = parseInt(document.getElementById('num-days').value) || 5;
@@ -2399,6 +2408,10 @@ function buildRoute() {
 
   document.getElementById('route-list-label').textContent =
     `Percorso per zone · ${pool.length} farmacie`;
+
+  // Ripristina bottone
+  const _btn = document.querySelector('button[onclick="buildRoute()"]');
+  if (_btn) { _btn.disabled = false; _btn.textContent = '⚙ Genera percorsi'; }
 }
 
 
@@ -2933,28 +2946,41 @@ function renderFarmacie() {
 
   list.innerHTML = '';
   if (!pool.length) { list.innerHTML='<div class="empty-state"><div class="icon">🔍</div><h4>Nessun risultato</h4></div>'; return; }
-  pool.forEach(f => {
-    const fd = data[String(f.id)]||{};
-    const stato = fd.stato||'';
-    const bg = stato==='visitata'?'var(--green-light)':stato==='richiamare'?'var(--amber-light)':stato==='assente'?'var(--red-light)':'var(--card)';
-    const emoji = stato==='visitata'?'✅':stato==='richiamare'?'🔁':stato==='assente'?'🔴':'';
-    const scad = isScaduta(f.id);
-    const item = document.createElement('div');
-    item.className = 'farmacia-item fade-in';
-    item.style.background = bg;
-    if (scad && !stato) item.style.borderLeft = '3px solid var(--red)';
-    if (fd.isTop) item.style.borderLeft = '3px solid var(--amber)';
-    item.innerHTML = `
-      <div class="farmacia-info">
-        <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
-        <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
-        ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
-      </div>
-      <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':f.p==='DR MAX'?'badge-drmax':'badge-lf'}">${f.p}</div>
-    `;
-    item.onclick = () => openModal(f.id);
-    list.appendChild(item);
-  });
+
+  // Rendering a chunk: 50 elementi per frame per non bloccare l'UI
+  const CHUNK = 50;
+  let idx = 0;
+  function renderChunk() {
+    const fragment = document.createDocumentFragment();
+    const end = Math.min(idx + CHUNK, pool.length);
+    for (let i = idx; i < end; i++) {
+      const f = pool[i];
+      const fd = data[String(f.id)]||{};
+      const stato = fd.stato||'';
+      const bg = stato==='visitata'?'var(--green-light)':stato==='richiamare'?'var(--amber-light)':stato==='assente'?'var(--red-light)':'var(--card)';
+      const emoji = stato==='visitata'?'✅':stato==='richiamare'?'🔁':stato==='assente'?'🔴':'';
+      const scad = isScaduta(f.id);
+      const item = document.createElement('div');
+      item.className = 'farmacia-item fade-in';
+      item.style.background = bg;
+      if (scad && !stato) item.style.borderLeft = '3px solid var(--red)';
+      if (fd.isTop) item.style.borderLeft = '3px solid var(--amber)';
+      item.innerHTML = `
+        <div class="farmacia-info">
+          <div class="farmacia-name">${fd.isTop?'⭐ ':''}${fd.isCliente?'🤝 ':fd.isProspect?'🔍 ':''}${emoji} ${fd.nomeCustom||f.n}</div>
+          <div class="farmacia-addr">${f.a} · ${f.loc}${scad&&!stato?' <span style="color:var(--red);font-size:0.65rem;">⏰</span>':''}</div>
+          ${fd.note ? `<div style="font-size:0.69rem;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${fd.note}</div>` : ''}
+        </div>
+        <div class="farmacia-badge ${f.p==='MB'?'badge-mb':f.p==='LC'?'badge-lc':f.p==='SO'?'badge-so':'badge-lf'}">${f.p}</div>
+      `;
+      item.onclick = () => openModal(f.id);
+      fragment.appendChild(item);
+    }
+    list.appendChild(fragment);
+    idx = end;
+    if (idx < pool.length) requestAnimationFrame(renderChunk);
+  }
+  requestAnimationFrame(renderChunk);
 }
 
 function onGlobalSearch(val) {
